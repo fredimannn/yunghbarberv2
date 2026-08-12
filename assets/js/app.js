@@ -7,7 +7,7 @@ let fechaSeleccionadaGlobal = new Date();
 let ratingValueGlobal = 5;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Escuchar cambios en tiempo real desde Firebase
+    // Suscripciones en tiempo real a Firebase
     StorageManager.suscribirCitas((citas) => {
         citasEfectivas = citas;
         renderizarVistaActual();
@@ -36,7 +36,7 @@ function renderizarVistaActual() {
     renderizarTablaCitasBarbero();
 }
 
-// --- LÓGICA DE CALENDARIO ---
+// --- RENDERIZADO DEL CALENDARIO (ESTILO FOTO) ---
 function inicializarCalendarios() {
     renderizarCalendario('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
     renderizarCalendario('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
@@ -50,15 +50,17 @@ function setupNavCalendario(btnPrevId, btnNextId, gridId, monthTitleId, selected
     const btnNext = document.getElementById(btnNextId);
 
     if (btnPrev && btnNext) {
-        btnPrev.addEventListener('click', () => {
+        btnPrev.onclick = () => {
             fechaSeleccionadaGlobal.setMonth(fechaSeleccionadaGlobal.getMonth() - 1);
             renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInputId);
-        });
+            renderizarVistaActual();
+        };
 
-        btnNext.addEventListener('click', () => {
+        btnNext.onclick = () => {
             fechaSeleccionadaGlobal.setMonth(fechaSeleccionadaGlobal.getMonth() + 1);
             renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInputId);
-        });
+            renderizarVistaActual();
+        };
     }
 }
 
@@ -75,7 +77,7 @@ function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInput
     const month = fechaSeleccionadaGlobal.getMonth();
 
     const primerDiaMes = new Date(year, month, 1);
-    const ultimoDiaMes = new Date(year, month + 1, 0);
+    const ultimoDiaMes = new Date(year, month + 1, 0).getDate();
 
     const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     if (monthTitle) monthTitle.textContent = `${nombresMeses[month]} De ${year}`;
@@ -83,7 +85,7 @@ function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInput
     let primerDiaSemanaIndex = primerDiaMes.getDay() - 1;
     if (primerDiaSemanaIndex === -1) primerDiaSemanaIndex = 6;
 
-    // Días mes anterior
+    // Días del mes anterior
     const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
     for (let i = primerDiaSemanaIndex - 1; i >= 0; i--) {
         const div = document.createElement('div');
@@ -95,7 +97,7 @@ function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInput
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
-    // Días mes actual
+    // Días del mes actual
     for (let dia = 1; dia <= ultimoDiaMes; dia++) {
         const div = document.createElement('div');
         div.className = 'cal-day';
@@ -113,18 +115,18 @@ function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInput
                 if (selectedLabel) selectedLabel.textContent = formatFechaLegible(fechaEvaluada);
             }
 
-            div.addEventListener('click', () => {
+            div.onclick = () => {
                 fechaSeleccionadaGlobal = new Date(year, month, dia);
                 renderizarCalendario('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
                 renderizarCalendario('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
                 renderizarVistaActual();
-            });
+            };
         }
         grid.appendChild(div);
     }
 }
 
-// --- VISTA CLIENTE: SELECCIÓN DE HORARIOS ---
+// --- HORARIOS DISPONIBLES ---
 function renderizarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
     if (!contenedor) return;
@@ -151,21 +153,21 @@ function renderizarHorariosCliente() {
     });
 }
 
-// --- FORMULARIO DE RESERVA ---
+// --- FORMULARIOS ---
 function inicializarFormularios() {
     const formAgenda = document.getElementById('form-agenda');
     if (formAgenda) {
         const btnsHora = formAgenda.querySelectorAll('.btn-hora');
         btnsHora.forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.onclick = () => {
                 if (btn.disabled) return;
                 btnsHora.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 document.getElementById('hora').value = btn.getAttribute('data-hora');
-            });
+            };
         });
 
-        formAgenda.addEventListener('submit', async (e) => {
+        formAgenda.onsubmit = async (e) => {
             e.preventDefault();
             const nombre = document.getElementById('nombre').value.trim();
             const fecha = document.getElementById('fecha').value;
@@ -186,15 +188,15 @@ function inicializarFormularios() {
                 document.getElementById('hora').value = '';
                 btnsHora.forEach(b => b.classList.remove('active'));
             } else {
-                alert("Hubo un error al guardar tu cita. Intenta nuevamente.");
+                alert("Error al guardar cita en la base de datos.");
             }
-        });
+        };
     }
 
-    // Formulario de Reseña
+    // Formulario Reseñas
     const formResena = document.getElementById('form-resena');
     if (formResena) {
-        formResena.addEventListener('submit', async (e) => {
+        formResena.onsubmit = async (e) => {
             e.preventDefault();
             const nombre = document.getElementById('resena-nombre').value.trim();
             const comentario = document.getElementById('resena-comentario').value.trim();
@@ -209,16 +211,16 @@ function inicializarFormularios() {
 
             const exito = await StorageManager.saveResena(nuevaResena);
             if (exito) {
-                alert("¡Gracias por tu opinión! Se ha publicado correctamente.");
+                alert("¡Opinión publicada con éxito!");
                 formResena.reset();
             }
-        });
+        };
     }
 
-    // Formulario Login Barbero
+    // Login Barbero (Clave 1234)
     const formLogin = document.getElementById('form-login-barbero');
     if (formLogin) {
-        formLogin.addEventListener('submit', (e) => {
+        formLogin.onsubmit = (e) => {
             e.preventDefault();
             const pin = document.getElementById('pin-ingresado').value.trim();
             if (pin === "1234") {
@@ -227,11 +229,11 @@ function inicializarFormularios() {
             } else {
                 alert("Clave incorrecta. Intenta nuevamente.");
             }
-        });
+        };
     }
 }
 
-// --- PANEL BARBERO: DISPONIBILIDAD Y CITAS ---
+// --- PANEL BARBERO ---
 function renderizarControlDisponibilidadBarbero() {
     const checkBloquearDia = document.getElementById('check-bloquear-dia');
     const gridHorasBarbero = document.getElementById('grid-horas-barbero');
@@ -247,10 +249,10 @@ function renderizarControlDisponibilidadBarbero() {
         await StorageManager.saveBloqueoFecha(fechaStr, configDia);
     };
 
-    const horasEstdar = ["10:00", "11:00", "12:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
+    const horasEstandar = ["10:00", "11:00", "12:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
     gridHorasBarbero.innerHTML = '';
 
-    horasEstdar.forEach(hora => {
+    horasEstandar.forEach(hora => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn-hora-barbero';
@@ -344,20 +346,20 @@ function verificarAutenticacionBarbero() {
     }
 }
 
-// --- RESEÑAS ---
+// --- RESEÑAS & ESTRELLAS ---
 function inicializarRatingStars() {
     const starsContainer = document.getElementById('rating-stars');
     if (!starsContainer) return;
 
     const stars = starsContainer.querySelectorAll('.star');
     stars.forEach(s => {
-        s.addEventListener('click', () => {
+        s.onclick = () => {
             ratingValueGlobal = parseInt(s.getAttribute('data-value'));
             stars.forEach((st, idx) => {
                 if (idx < ratingValueGlobal) st.classList.add('active');
                 else st.classList.remove('active');
             });
-        });
+        };
     });
 }
 
