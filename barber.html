@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yunghbarber | Panel Barbero</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <!-- Modal de Autenticación / PIN de Seguridad (Clave: 1234) -->
+    <div id="modal-auth" class="modal-auth-container">
+        <div class="card-box card-auth">
+            <h2>🔒 Acceso Restringido</h2>
+            <p style="color: #9ca3af; font-size: 0.9rem; margin-top: 6px;">Ingresa la clave para acceder al panel del barbero:</p>
+            
+            <form id="form-login-barbero" style="margin-top: 15px;">
+                <div class="campo">
+                    <input type="password" id="pin-ingresado" placeholder="Clave (1234)" maxlength="10" required style="text-align: center; font-size: 1.2rem; letter-spacing: 2px;">
+                </div>
+                <button type="submit" class="btn-confirmar">Ingresar al Panel 🚀</button>
+            </form>
+            
+            <div style="margin-top: 15px; text-align: center;">
+                <a href="index.html" class="btn-panel" style="font-size: 0.85rem; padding: 6px 12px; display: inline-block;">Volver a la App 🏠</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido del Panel (Oculto hasta autenticarse) -->
+    <div id="contenido-barbero" style="display: none;">
+        <header class="header-bar">
+            <div class="logo">
+                <h1>YUNGHBARBER 💈</h1>
+                <p>Panel Administrativo</p>
+            </div>
+            <div>
+                <button type="button" onclick="cerrarSesionBarbero()" class="btn-eliminar" style="margin-right: 8px; font-size: 0.85rem;">🔒 Salir</button>
+                <a href="index.html" class="btn-panel">Volver a la App 🏠</a>
+            </div>
+        </header>
+
+        <main class="contenedor-principal">
+            <!-- Control de Disponibilidad / Horarios del Barbero -->
+            <section class="card-box">
+                <h2>📅 Gestión de Horarios y Días Libres</h2>
+                <p class="subtitulo-seccion" style="color: #9ca3af; margin-bottom: 12px;">Configura tus días de estudio o descanso</p>
+                
+                <div class="campo">
+                    <label>Seleccionar Fecha a Configurar:</label>
+                    <div class="calendar-widget" id="barber-calendar-widget">
+                        <div class="cal-header-selected" id="barber-cal-selected-label">
+                            Miércoles, 12 De Agosto
+                        </div>
+                        
+                        <div class="cal-nav-bar">
+                            <span class="cal-month-title" id="barber-cal-month-title">Agosto De 2026</span>
+                            <div class="cal-nav-btns">
+                                <button type="button" class="btn-cal-nav" id="barber-btn-prev-month">▲</button>
+                                <button type="button" class="btn-cal-nav" id="barber-btn-next-month">▼</button>
+                            </div>
+                        </div>
+
+                        <div class="cal-weekdays">
+                            <span>lu</span><span>ma</span><span>mi</span><span>ju</span><span>vi</span><span>sá</span><span>do</span>
+                        </div>
+
+                        <div class="cal-days-grid" id="barber-cal-days-grid"></div>
+                    </div>
+
+                    <input type="hidden" id="barber-fecha-gestion" required>
+                </div>
+
+                <div class="box-bloqueo-dia" style="margin-top: 15px;">
+                    <label class="switch-container">
+                        <input type="checkbox" id="check-bloquear-dia">
+                        <span class="slider"></span>
+                        <strong>Tomarme el día completo (No disponible)</strong>
+                    </label>
+                </div>
+
+                <div class="contenedor-horas-barbero" id="contenedor-horas-barbero">
+                    <p class="titulo-deja-resena" style="margin-top: 15px;">Selecciona las horas que NO trabajarás este día:</p>
+                    <div class="grid-horarios-barbero" id="grid-horas-barbero"></div>
+                </div>
+            </section>
+
+            <!-- Control de Citas Agendadas y Sincronización -->
+            <section class="card-box" style="margin-top: 2rem;">
+                <h2>Horas Agendadas por Clientes</h2>
+                <div id="contenedor-citas"></div>
+            </section>
+
+            <!-- Control y Respuesta de Reseñas -->
+            <section class="card-box" style="margin-top: 2rem;">
+                <h2>💬 Gestión y Respuesta de Reseñas</h2>
+                <div id="contenedor-gestion-resenas"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="assets/js/storage.js" defer></script>
+    <script src="assets/js/validator.js" defer></script>
+    <script src="assets/js/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "short_name": "YungHBarber",
+  "name": "YungHBarber - Reserva tu Hora",
+  "description": "Aplicación web para agendamiento de horas y cortes de pelo en YungHBarber",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#05080f",
+  "theme_color": "#0b111e",
+  "display": "standalone",
+  "orientation": "portrait"
+}
