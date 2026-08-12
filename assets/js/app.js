@@ -7,7 +7,13 @@ let fechaSeleccionadaGlobal = new Date();
 let ratingValueGlobal = 5;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Suscripciones en tiempo real a Firebase
+    // 1. Renderizar calendario INMEDIATAMENTE para evitar pantallas vacías
+    inicializarCalendarios();
+    inicializarFormularios();
+    inicializarRatingStars();
+    verificarAutenticacionBarbero();
+
+    // 2. Conectar las suscripciones de Firebase
     StorageManager.suscribirCitas((citas) => {
         citasEfectivas = citas;
         renderizarVistaActual();
@@ -23,11 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderizarResenasCliente();
         renderizarGestionResenasBarbero();
     });
-
-    inicializarCalendarios();
-    inicializarFormularios();
-    inicializarRatingStars();
-    verificarAutenticacionBarbero();
 });
 
 function renderizarVistaActual() {
@@ -36,7 +37,7 @@ function renderizarVistaActual() {
     renderizarTablaCitasBarbero();
 }
 
-// --- RENDERIZADO DEL CALENDARIO (ESTILO FOTO) ---
+// --- RENDERIZADO EXACTO DEL CALENDARIO (FOTO 2) ---
 function inicializarCalendarios() {
     renderizarCalendario('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
     renderizarCalendario('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
@@ -79,13 +80,15 @@ function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInput
     const primerDiaMes = new Date(year, month, 1);
     const ultimoDiaMes = new Date(year, month + 1, 0).getDate();
 
-    const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    if (monthTitle) monthTitle.textContent = `${nombresMeses[month]} De ${year}`;
+    const nombresMeses = ['Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio'];
+    const nombreMesActual = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][month];
+    
+    if (monthTitle) monthTitle.textContent = `${nombreMesActual} De ${year}`;
 
     let primerDiaSemanaIndex = primerDiaMes.getDay() - 1;
     if (primerDiaSemanaIndex === -1) primerDiaSemanaIndex = 6;
 
-    // Días del mes anterior
+    // Días del mes anterior (Tono oscuro/inactivo)
     const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
     for (let i = primerDiaSemanaIndex - 1; i >= 0; i--) {
         const div = document.createElement('div');
@@ -126,7 +129,7 @@ function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInput
     }
 }
 
-// --- HORARIOS DISPONIBLES ---
+// --- HORARIOS ---
 function renderizarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
     if (!contenedor) return;
@@ -188,7 +191,7 @@ function inicializarFormularios() {
                 document.getElementById('hora').value = '';
                 btnsHora.forEach(b => b.classList.remove('active'));
             } else {
-                alert("Error al guardar cita en la base de datos.");
+                alert("Error al agendar la hora. Intenta nuevamente.");
             }
         };
     }
@@ -211,13 +214,13 @@ function inicializarFormularios() {
 
             const exito = await StorageManager.saveResena(nuevaResena);
             if (exito) {
-                alert("¡Opinión publicada con éxito!");
+                alert("¡Opinión publicada!");
                 formResena.reset();
             }
         };
     }
 
-    // Login Barbero (Clave 1234)
+    // Login Barbero con Clave 1234
     const formLogin = document.getElementById('form-login-barbero');
     if (formLogin) {
         formLogin.onsubmit = (e) => {
