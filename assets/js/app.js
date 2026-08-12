@@ -1,580 +1,288 @@
-/**
- * Controlador Principal - YungHBarber
- */
+import { StorageManager } from './storage.js';
 
-const PIN_BARBERO = '1234';
-
-let calificacionSeleccionada = 5;
-let horaSeleccionada = '';
-
-let fechaActualCliente = new Date();
-let fechaSeleccionadaCliente = new Date();
-
-let fechaActualBarbero = new Date();
-let fechaSeleccionadaBarbero = new Date();
-
-const LISTA_HORAS_BASE = ['10:00', '11:00', '12:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+let citasEfectivas = [];
+let bloqueosGlobales = {};
+let resenasEfectivas = [];
+let fechaSeleccionadaGlobal = new Date();
+let ratingValueGlobal = 5;
 
 document.addEventListener('DOMContentLoaded', () => {
-    initAuthBarbero();
-    initClienteCalendar();
-    initBarberoCalendar();
-    initClienteView();
-    initBarberoView();
-    initRatingStars();
-    initHorariosSelector();
-    initStorageListener();
+    // Escuchar cambios en tiempo real desde Firebase
+    StorageManager.suscribirCitas((citas) => {
+        citasEfectivas = citas;
+        renderizarVistaActual();
+    });
+
+    StorageManager.suscribirBloqueos((bloqueos) => {
+        bloqueosGlobales = bloqueos;
+        renderizarVistaActual();
+    });
+
+    StorageManager.suscribirResenas((resenas) => {
+        resenasEfectivas = resenas;
+        renderizarResenasCliente();
+        renderizarGestionResenasBarbero();
+    });
+
+    inicializarCalendarios();
+    inicializarFormularios();
+    inicializarRatingStars();
+    verificarAutenticacionBarbero();
 });
 
-function toCapitalizeWords(str) {
-    return str.replace(/\b\w/g, char => char.toUpperCase());
+function renderizarVistaActual() {
+    renderizarHorariosCliente();
+    renderizarControlDisponibilidadBarbero();
+    renderizarTablaCitasBarbero();
 }
 
-/**
- * Control del Login de Barbero con Clave '1234'
- */
-function initAuthBarbero() {
-    const modalAuth = document.getElementById('modal-auth');
-    const contenidoBarbero = document.getElementById('contenido-barbero');
-    const formLogin = document.getElementById('form-login-barbero');
+// --- LÓGICA DE CALENDARIO ---
+function inicializarCalendarios() {
+    renderizarCalendario('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
+    renderizarCalendario('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
 
-    if (!modalAuth || !contenidoBarbero) return;
-
-    const autenticado = sessionStorage.getItem('yunghbarber_auth') === 'true';
-
-    if (autenticado) {
-        modalAuth.style.display = 'none';
-        contenidoBarbero.style.display = 'block';
-    } else {
-        modalAuth.style.display = 'flex';
-        contenidoBarbero.style.display = 'none';
-    }
-
-    if (formLogin) {
-        formLogin.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const pinInput = document.getElementById('pin-ingresado')?.value;
-
-            if (pinInput === PIN_BARBERO) {
-                sessionStorage.setItem('yunghbarber_auth', 'true');
-                modalAuth.style.display = 'none';
-                contenidoBarbero.style.display = 'block';
-                renderBarberoCalendar();
-                renderCitasBarbero();
-                renderResenasBarbero();
-            } else {
-                alert('Clave incorrecta. Inténtalo de nuevo.');
-                document.getElementById('pin-ingresado').value = '';
-            }
-        });
-    }
+    setupNavCalendario('btn-prev-month', 'btn-next-month', 'cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
+    setupNavCalendario('barber-btn-prev-month', 'barber-btn-next-month', 'barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
 }
 
-window.cerrarSesionBarbero = function() {
-    sessionStorage.removeItem('yunghbarber_auth');
-    location.reload();
-};
+function setupNavCalendario(btnPrevId, btnNextId, gridId, monthTitleId, selectedLabelId, hiddenInputId) {
+    const btnPrev = document.getElementById(btnPrevId);
+    const btnNext = document.getElementById(btnNextId);
 
-/**
- * Genera la URL para Google Calendar (Exclusivo Barbero)
- */
-function crearEnlaceGoogleCalendar(cita) {
-    try {
-        const fechaHoraInicio = new Date(`${cita.fecha}T${cita.hora}:00`);
-        const fechaHoraFin = new Date(fechaHoraInicio.getTime() + 45 * 60000);
-
-        const formatISO = (date) => date.toISOString().replace(/-|:|\.\d\d\d/g, '');
-
-        const titulo = encodeURIComponent(`Corte YungHBarber 💈: ${cita.nombre}`);
-        const detalles = encodeURIComponent(`Cliente: ${cita.nombre}\nServicio: ${cita.servicio}\nEstado: ${cita.estado}`);
-        const inicio = formatISO(fechaHoraInicio);
-        const fin = formatISO(fechaHoraFin);
-
-        return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titulo}&dates=${inicio}/${fin}&details=${detalles}`;
-    } catch (e) {
-        console.error('Error al generar URL de Google Calendar:', e);
-        return '#';
-    }
-}
-
-/**
- * Calendario Vista Cliente
- */
-function initClienteCalendar() {
-    const btnPrev = document.getElementById('btn-prev-month');
-    const btnNext = document.getElementById('btn-next-month');
-
-    if (btnPrev) {
+    if (btnPrev && btnNext) {
         btnPrev.addEventListener('click', () => {
-            fechaActualCliente.setMonth(fechaActualCliente.getMonth() - 1);
-            renderClienteCalendar();
+            fechaSeleccionadaGlobal.setMonth(fechaSeleccionadaGlobal.getMonth() - 1);
+            renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInputId);
         });
-    }
 
-    if (btnNext) {
         btnNext.addEventListener('click', () => {
-            fechaActualCliente.setMonth(fechaActualCliente.getMonth() + 1);
-            renderClienteCalendar();
+            fechaSeleccionadaGlobal.setMonth(fechaSeleccionadaGlobal.getMonth() + 1);
+            renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInputId);
         });
     }
-
-    renderClienteCalendar();
 }
 
-function renderClienteCalendar() {
-    const grid = document.getElementById('cal-days-grid');
-    const labelSelected = document.getElementById('cal-selected-label');
-    const titleMonth = document.getElementById('cal-month-title');
-    const inputHidden = document.getElementById('fecha');
+function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInputId) {
+    const grid = document.getElementById(gridId);
+    const monthTitle = document.getElementById(monthTitleId);
+    const selectedLabel = document.getElementById(selectedLabelId);
+    const hiddenInput = document.getElementById(hiddenInputId);
 
     if (!grid) return;
 
     grid.innerHTML = '';
+    const year = fechaSeleccionadaGlobal.getFullYear();
+    const month = fechaSeleccionadaGlobal.getMonth();
 
-    const año = fechaActualCliente.getFullYear();
-    const mes = fechaActualCliente.getMonth();
+    const primerDiaMes = new Date(year, month, 1);
+    const ultimoDiaMes = new Date(year, month + 1, 0);
 
-    const nombreMes = fechaActualCliente.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-    if (titleMonth) titleMonth.textContent = toCapitalizeWords(nombreMes);
+    const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    if (monthTitle) monthTitle.textContent = `${nombresMeses[month]} De ${year}`;
 
-    const opcionesTexto = { weekday: 'long', day: 'numeric', month: 'long' };
-    if (labelSelected) labelSelected.textContent = toCapitalizeWords(fechaSeleccionadaCliente.toLocaleDateString('es-ES', opcionesTexto));
+    let primerDiaSemanaIndex = primerDiaMes.getDay() - 1;
+    if (primerDiaSemanaIndex === -1) primerDiaSemanaIndex = 6;
 
-    const yyyy = fechaSeleccionadaCliente.getFullYear();
-    const mm = String(fechaSeleccionadaCliente.getMonth() + 1).padStart(2, '0');
-    const dd = String(fechaSeleccionadaCliente.getDate()).padStart(2, '0');
-    const fechaStringFormat = `${yyyy}-${mm}-${dd}`;
-    if (inputHidden) inputHidden.value = fechaStringFormat;
-
-    const primerDiaMes = new Date(año, mes, 1);
-    const ultimoDiaMes = new Date(año, mes + 1, 0);
-
-    let diaSemanaInicio = primerDiaMes.getDay() - 1;
-    if (diaSemanaInicio === -1) diaSemanaInicio = 6;
-
-    const diasMesAnterior = new Date(año, mes, 0).getDate();
-
-    for (let i = diaSemanaInicio - 1; i >= 0; i--) {
-        const numDia = diasMesAnterior - i;
+    // Días mes anterior
+    const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
+    for (let i = primerDiaSemanaIndex - 1; i >= 0; i--) {
         const div = document.createElement('div');
         div.className = 'cal-day other-month';
-        div.textContent = numDia;
+        div.textContent = ultimoDiaMesAnterior - i;
         grid.appendChild(div);
     }
 
-    const hoyExacto = new Date();
-    hoyExacto.setHours(0, 0, 0, 0);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
 
-    for (let d = 1; d <= ultimoDiaMes.getDate(); d++) {
+    // Días mes actual
+    for (let dia = 1; dia <= ultimoDiaMes; dia++) {
         const div = document.createElement('div');
         div.className = 'cal-day';
-        div.textContent = d;
+        div.textContent = dia;
 
-        const iterFecha = new Date(año, mes, d);
+        const fechaEvaluada = new Date(year, month, dia);
+        const fechaFormatted = formatDate(fechaEvaluada);
 
-        if (iterFecha < hoyExacto) {
+        if (fechaEvaluada < hoy) {
             div.classList.add('disabled');
         } else {
-            if (
-                iterFecha.getFullYear() === fechaSeleccionadaCliente.getFullYear() &&
-                iterFecha.getMonth() === fechaSeleccionadaCliente.getMonth() &&
-                iterFecha.getDate() === fechaSeleccionadaCliente.getDate()
-            ) {
+            if (fechaFormatted === formatDate(fechaSeleccionadaGlobal)) {
                 div.classList.add('selected');
+                if (hiddenInput) hiddenInput.value = fechaFormatted;
+                if (selectedLabel) selectedLabel.textContent = formatFechaLegible(fechaEvaluada);
             }
 
             div.addEventListener('click', () => {
-                fechaSeleccionadaCliente = new Date(año, mes, d);
-                renderClienteCalendar();
+                fechaSeleccionadaGlobal = new Date(year, month, dia);
+                renderizarCalendario('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
+                renderizarCalendario('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
+                renderizarVistaActual();
             });
         }
-
         grid.appendChild(div);
     }
-
-    const totalCeldas = grid.children.length;
-    const celdasRestantes = (Math.ceil(totalCeldas / 7) * 7) - totalCeldas;
-
-    for (let j = 1; j <= celdasRestantes; j++) {
-        const div = document.createElement('div');
-        div.className = 'cal-day other-month';
-        div.textContent = j;
-        grid.appendChild(div);
-    }
-
-    actualizarDisponibilidadHorarios(fechaStringFormat);
 }
 
-/**
- * Calendario Vista Barbero
- */
-function initBarberoCalendar() {
-    const btnPrev = document.getElementById('barber-btn-prev-month');
-    const btnNext = document.getElementById('barber-btn-next-month');
-
-    if (btnPrev) {
-        btnPrev.addEventListener('click', () => {
-            fechaActualBarbero.setMonth(fechaActualBarbero.getMonth() - 1);
-            renderBarberoCalendar();
-        });
-    }
-
-    if (btnNext) {
-        btnNext.addEventListener('click', () => {
-            fechaActualBarbero.setMonth(fechaActualBarbero.getMonth() + 1);
-            renderBarberoCalendar();
-        });
-    }
-
-    renderBarberoCalendar();
-}
-
-function renderBarberoCalendar() {
-    const grid = document.getElementById('barber-cal-days-grid');
-    const labelSelected = document.getElementById('barber-cal-selected-label');
-    const titleMonth = document.getElementById('barber-cal-month-title');
-    const inputHidden = document.getElementById('barber-fecha-gestion');
-
-    if (!grid) return;
-
-    grid.innerHTML = '';
-
-    const año = fechaActualBarbero.getFullYear();
-    const mes = fechaActualBarbero.getMonth();
-
-    const nombreMes = fechaActualBarbero.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-    if (titleMonth) titleMonth.textContent = toCapitalizeWords(nombreMes);
-
-    const opcionesTexto = { weekday: 'long', day: 'numeric', month: 'long' };
-    if (labelSelected) labelSelected.textContent = toCapitalizeWords(fechaSeleccionadaBarbero.toLocaleDateString('es-ES', opcionesTexto));
-
-    const yyyy = fechaSeleccionadaBarbero.getFullYear();
-    const mm = String(fechaSeleccionadaBarbero.getMonth() + 1).padStart(2, '0');
-    const dd = String(fechaSeleccionadaBarbero.getDate()).padStart(2, '0');
-    const fechaStringFormat = `${yyyy}-${mm}-${dd}`;
-    if (inputHidden) inputHidden.value = fechaStringFormat;
-
-    const primerDiaMes = new Date(año, mes, 1);
-    const ultimoDiaMes = new Date(año, mes + 1, 0);
-
-    let diaSemanaInicio = primerDiaMes.getDay() - 1;
-    if (diaSemanaInicio === -1) diaSemanaInicio = 6;
-
-    const diasMesAnterior = new Date(año, mes, 0).getDate();
-
-    for (let i = diaSemanaInicio - 1; i >= 0; i--) {
-        const numDia = diasMesAnterior - i;
-        const div = document.createElement('div');
-        div.className = 'cal-day other-month';
-        div.textContent = numDia;
-        grid.appendChild(div);
-    }
-
-    const hoyExacto = new Date();
-    hoyExacto.setHours(0, 0, 0, 0);
-
-    for (let d = 1; d <= ultimoDiaMes.getDate(); d++) {
-        const div = document.createElement('div');
-        div.className = 'cal-day';
-        div.textContent = d;
-
-        const iterFecha = new Date(año, mes, d);
-
-        if (iterFecha < hoyExacto) {
-            div.classList.add('disabled');
-        } else {
-            if (
-                iterFecha.getFullYear() === fechaSeleccionadaBarbero.getFullYear() &&
-                iterFecha.getMonth() === fechaSeleccionadaBarbero.getMonth() &&
-                iterFecha.getDate() === fechaSeleccionadaBarbero.getDate()
-            ) {
-                div.classList.add('selected');
-            }
-
-            div.addEventListener('click', () => {
-                fechaSeleccionadaBarbero = new Date(año, mes, d);
-                renderBarberoCalendar();
-            });
-        }
-
-        grid.appendChild(div);
-    }
-
-    const totalCeldas = grid.children.length;
-    const celdasRestantes = (Math.ceil(totalCeldas / 7) * 7) - totalCeldas;
-
-    for (let j = 1; j <= celdasRestantes; j++) {
-        const div = document.createElement('div');
-        div.className = 'cal-day other-month';
-        div.textContent = j;
-        grid.appendChild(div);
-    }
-
-    cargarControlesGestionBarbero(fechaStringFormat);
-}
-
-function actualizarDisponibilidadHorarios(fechaFormatted) {
+// --- VISTA CLIENTE: SELECCIÓN DE HORARIOS ---
+function renderizarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
-    const inputOcultoHora = document.getElementById('hora');
     if (!contenedor) return;
 
-    const configBloqueo = StorageManager.getBloqueoFecha(fechaFormatted);
-    const citas = StorageManager.getCitas();
-    const horasAgendadas = citas
-        .filter(c => c.fecha === fechaFormatted && c.estado !== 'Cancelada')
-        .map(c => c.hora);
+    const fechaStr = formatDate(fechaSeleccionadaGlobal);
+    const configDia = bloqueosGlobales[fechaStr] || { bloqueadoCompleto: false, horasBloqueadas: [] };
+    const citasDelDia = citasEfectivas.filter(c => c.fecha === fechaStr);
 
     const botones = contenedor.querySelectorAll('.btn-hora');
-
     botones.forEach(btn => {
-        const horaBtn = btn.getAttribute('data-hora');
+        const hora = btn.getAttribute('data-hora');
+        const estaOcupadaPorCita = citasDelDia.some(c => c.hora === hora);
+        const estaBloqueadaPorBarbero = configDia.bloqueadoCompleto || (configDia.horasBloqueadas && configDia.horasBloqueadas.includes(hora));
 
-        if (configBloqueo.diaBloqueado) {
+        if (estaOcupadaPorCita || estaBloqueadaPorBarbero) {
             btn.disabled = true;
             btn.classList.add('ocupado');
-            btn.classList.remove('active');
-            btn.textContent = `No Disponible`;
-        } else if (horasAgendadas.includes(horaBtn) || (configBloqueo.horasDesactivadas && configBloqueo.horasDesactivadas.includes(horaBtn))) {
-            btn.disabled = true;
-            btn.classList.add('ocupado');
-            btn.classList.remove('active');
-            btn.textContent = `${horaBtn} (Ocupado)`;
-
-            if (horaSeleccionada === horaBtn) {
-                horaSeleccionada = '';
-                if (inputOcultoHora) inputOcultoHora.value = '';
-            }
+            btn.textContent = `${hora} (No Disp.)`;
         } else {
             btn.disabled = false;
             btn.classList.remove('ocupado');
-            btn.textContent = `${horaBtn} hrs`;
+            btn.textContent = `${hora} hrs`;
         }
     });
 }
 
-function initHorariosSelector() {
-    const contenedor = document.getElementById('selector-horarios');
-    const inputOcultoHora = document.getElementById('hora');
-    if (!contenedor) return;
-
-    const botones = contenedor.querySelectorAll('.btn-hora');
-    botones.forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (btn.disabled) return;
-
-            botones.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            horaSeleccionada = btn.getAttribute('data-hora');
-            if (inputOcultoHora) inputOcultoHora.value = horaSeleccionada;
-        });
-    });
-}
-
-function initRatingStars() {
-    const starsContainer = document.getElementById('rating-stars');
-    if (!starsContainer) return;
-
-    const stars = starsContainer.querySelectorAll('.star');
-
-    stars.forEach(star => {
-        star.addEventListener('mouseenter', () => {
-            const val = parseInt(star.getAttribute('data-value'), 10);
-            highlightStars(stars, val);
-        });
-
-        starsContainer.addEventListener('mouseleave', () => {
-            highlightStars(stars, calificacionSeleccionada);
-        });
-
-        star.addEventListener('click', () => {
-            calificacionSeleccionada = parseInt(star.getAttribute('data-value'), 10);
-            highlightStars(stars, calificacionSeleccionada);
-        });
-    });
-
-    highlightStars(stars, calificacionSeleccionada);
-}
-
-function highlightStars(stars, value) {
-    stars.forEach(s => {
-        const starValue = parseInt(s.getAttribute('data-value'), 10);
-        if (starValue <= value) {
-            s.classList.add('active');
-        } else {
-            s.classList.remove('active');
-        }
-    });
-}
-
-function initClienteView() {
+// --- FORMULARIO DE RESERVA ---
+function inicializarFormularios() {
     const formAgenda = document.getElementById('form-agenda');
-    const formResena = document.getElementById('form-resena');
-
     if (formAgenda) {
-        formAgenda.addEventListener('submit', (e) => {
+        const btnsHora = formAgenda.querySelectorAll('.btn-hora');
+        btnsHora.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.disabled) return;
+                btnsHora.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('hora').value = btn.getAttribute('data-hora');
+            });
+        });
+
+        formAgenda.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const nombre = document.getElementById('nombre').value.trim();
+            const fecha = document.getElementById('fecha').value;
+            const hora = document.getElementById('hora').value;
+            const servicio = document.getElementById('servicio').value;
 
-            const nombre = Validator.trimInput(document.getElementById('nombre')?.value);
-            const fecha = document.getElementById('fecha')?.value;
-            const hora = document.getElementById('hora')?.value;
-            const servicio = Validator.trimInput(document.getElementById('servicio')?.value);
-
-            if (!nombre || !fecha || !hora || !servicio) {
-                alert('Por favor completa todos los campos y selecciona una hora disponible.');
+            if (!hora) {
+                alert("Por favor selecciona una hora disponible.");
                 return;
             }
 
-            const validacionFecha = Validator.validarFechaHoraFutura(fecha, hora);
-            if (!validacionFecha.isValid) {
-                alert(validacionFecha.message);
-                return;
-            }
+            const nuevaCita = { nombre, fecha, hora, servicio, fechaCreacion: new Date().toISOString() };
+            const exito = await StorageManager.saveCita(nuevaCita);
 
-            const nuevaCita = { nombre, fecha, hora, servicio, estado: 'Pendiente' };
-
-            if (StorageManager.saveCita(nuevaCita)) {
-                alert('¡Hora agendada con éxito!');
+            if (exito) {
+                alert(`¡Hora agendada con éxito para el ${fecha} a las ${hora} hrs!`);
                 formAgenda.reset();
-                document.querySelectorAll('.btn-hora').forEach(b => b.classList.remove('active'));
-                horaSeleccionada = '';
-                renderClienteCalendar();
+                document.getElementById('hora').value = '';
+                btnsHora.forEach(b => b.classList.remove('active'));
             } else {
-                alert('Error al agendar la hora.');
+                alert("Hubo un error al guardar tu cita. Intenta nuevamente.");
             }
         });
     }
 
+    // Formulario de Reseña
+    const formResena = document.getElementById('form-resena');
     if (formResena) {
-        renderResenasCliente();
-
-        formResena.addEventListener('submit', (e) => {
+        formResena.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const nombre = Validator.trimInput(document.getElementById('resena-nombre')?.value);
-            const comentario = Validator.trimInput(document.getElementById('resena-comentario')?.value);
+            const nombre = document.getElementById('resena-nombre').value.trim();
+            const comentario = document.getElementById('resena-comentario').value.trim();
 
-            if (!nombre || !comentario) {
-                alert('Por favor escribe tu nombre y tu opinión.');
-                return;
-            }
+            const nuevaResena = {
+                nombre,
+                estrellas: ratingValueGlobal,
+                comentario,
+                fecha: formatDate(new Date()),
+                respuestaBarbero: null
+            };
 
-            const nuevaResena = { nombre, comentario, calificacion: calificacionSeleccionada };
-
-            if (StorageManager.saveResena(nuevaResena)) {
+            const exito = await StorageManager.saveResena(nuevaResena);
+            if (exito) {
+                alert("¡Gracias por tu opinión! Se ha publicado correctamente.");
                 formResena.reset();
-                calificacionSeleccionada = 5;
-                highlightStars(document.querySelectorAll('#rating-stars .star'), 5);
-                renderResenasCliente();
+            }
+        });
+    }
+
+    // Formulario Login Barbero
+    const formLogin = document.getElementById('form-login-barbero');
+    if (formLogin) {
+        formLogin.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pin = document.getElementById('pin-ingresado').value.trim();
+            if (pin === "1234") {
+                localStorage.setItem('barber_auth', 'true');
+                verificarAutenticacionBarbero();
+            } else {
+                alert("Clave incorrecta. Intenta nuevamente.");
             }
         });
     }
 }
 
-function renderResenasCliente() {
-    const contenedor = document.getElementById('lista-resenas');
-    if (!contenedor) return;
+// --- PANEL BARBERO: DISPONIBILIDAD Y CITAS ---
+function renderizarControlDisponibilidadBarbero() {
+    const checkBloquearDia = document.getElementById('check-bloquear-dia');
+    const gridHorasBarbero = document.getElementById('grid-horas-barbero');
+    if (!checkBloquearDia || !gridHorasBarbero) return;
 
-    const resenas = StorageManager.getResenas();
+    const fechaStr = formatDate(fechaSeleccionadaGlobal);
+    const configDia = bloqueosGlobales[fechaStr] || { bloqueadoCompleto: false, horasBloqueadas: [] };
 
-    if (resenas.length === 0) {
-        contenedor.innerHTML = '<p class="sin-resenas">Aún no hay opiniones. ¡Sé el primero en dejar una!</p>';
-        return;
-    }
+    checkBloquearDia.checked = configDia.bloqueadoCompleto;
 
-    let html = '';
-    resenas.forEach(r => {
-        const estrellasHtml = '★'.repeat(r.calificacion) + '☆'.repeat(5 - r.calificacion);
-        html += `
-            <div class="card-resena">
-                <div class="resena-header">
-                    <strong>${escapeHtml(r.nombre)}</strong>
-                    <span class="estrellas-render">${estrellasHtml}</span>
-                </div>
-                <p class="resena-texto">"${escapeHtml(r.comentario)}"</p>
-                ${r.respuestaBarbero ? `
-                    <div class="respuesta-barbero-box">
-                        <strong style="color: #fbbf24;">Respuesta de YungHBarber 💈:</strong>
-                        <p style="font-size: 0.85rem; color: #e2e8f0; margin-top: 4px;">${escapeHtml(r.respuestaBarbero)}</p>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    });
+    checkBloquearDia.onchange = async () => {
+        configDia.bloqueadoCompleto = checkBloquearDia.checked;
+        await StorageManager.saveBloqueoFecha(fechaStr, configDia);
+    };
 
-    contenedor.innerHTML = html;
-}
+    const horasEstdar = ["10:00", "11:00", "12:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
+    gridHorasBarbero.innerHTML = '';
 
-function initBarberoView() {
-    const contenedorCitas = document.getElementById('contenedor-citas');
-    const contenedorResenas = document.getElementById('contenedor-gestion-resenas');
-
-    if (contenedorCitas) renderCitasBarbero();
-    if (contenedorResenas) renderResenasBarbero();
-}
-
-function cargarControlesGestionBarbero(fechaFormatted) {
-    const checkDia = document.getElementById('check-bloquear-dia');
-    const gridHoras = document.getElementById('grid-horas-barbero');
-    if (!gridHoras) return;
-
-    const config = StorageManager.getBloqueoFecha(fechaFormatted);
-
-    if (checkDia) {
-        checkDia.checked = config.diaBloqueado || false;
-        
-        checkDia.onclick = () => {
-            config.diaBloqueado = checkDia.checked;
-            StorageManager.saveBloqueoFecha(fechaFormatted, config);
-            cargarControlesGestionBarbero(fechaFormatted);
-        };
-    }
-
-    gridHoras.innerHTML = '';
-
-    LISTA_HORAS_BASE.forEach(hora => {
+    horasEstdar.forEach(hora => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn-hora-barbero';
-
-        const estaBloqueada = config.horasDesactivadas && config.horasDesactivadas.includes(hora);
-
+        
+        const estaBloqueada = configDia.horasBloqueadas && configDia.horasBloqueadas.includes(hora);
         if (estaBloqueada) {
             btn.classList.add('bloqueada-barbero');
             btn.textContent = `${hora} (Bloqueada)`;
         } else {
-            btn.textContent = `${hora} (Disponible)`;
+            btn.textContent = `${hora} hrs`;
         }
 
-        if (config.diaBloqueado) {
-            btn.disabled = true;
-            btn.style.opacity = '0.4';
-        } else {
-            btn.disabled = false;
-        }
-
-        btn.addEventListener('click', () => {
-            if (!config.horasDesactivadas) config.horasDesactivadas = [];
-
+        btn.onclick = async () => {
+            if (!configDia.horasBloqueadas) configDia.horasBloqueadas = [];
             if (estaBloqueada) {
-                config.horasDesactivadas = config.horasDesactivadas.filter(h => h !== hora);
+                configDia.horasBloqueadas = configDia.horasBloqueadas.filter(h => h !== hora);
             } else {
-                config.horasDesactivadas.push(hora);
+                configDia.horasBloqueadas.push(hora);
             }
+            await StorageManager.saveBloqueoFecha(fechaStr, configDia);
+        };
 
-            StorageManager.saveBloqueoFecha(fechaFormatted, config);
-            cargarControlesGestionBarbero(fechaFormatted);
-        });
-
-        gridHoras.appendChild(btn);
+        gridHorasBarbero.appendChild(btn);
     });
 }
 
-function renderCitasBarbero() {
+function renderizarTablaCitasBarbero() {
     const contenedor = document.getElementById('contenedor-citas');
     if (!contenedor) return;
 
-    const citas = StorageManager.getCitas();
-    if (citas.length === 0) {
-        contenedor.innerHTML = '<p class="sin-datos">No hay horas agendadas.</p>';
+    if (citasEfectivas.length === 0) {
+        contenedor.innerHTML = '<p style="color: #9ca3af;">No hay citas agendadas por el momento.</p>';
         return;
     }
 
@@ -583,141 +291,160 @@ function renderCitasBarbero() {
             <thead>
                 <tr>
                     <th>Cliente</th>
-                    <th>Servicio</th>
                     <th>Fecha / Hora</th>
-                    <th>Estado</th>
-                    <th>Acciones Barbero</th>
+                    <th>Servicio</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
     `;
 
-    citas.forEach(cita => {
-        const calendarUrl = crearEnlaceGoogleCalendar(cita);
+    citasEfectivas.forEach(c => {
+        const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=Corte+Barberia+${encodeURIComponent(c.nombre)}&dates=${c.fecha.replace(/-/g, '')}T${c.hora.replace(':', '')}00Z/${c.fecha.replace(/-/g, '')}T${c.hora.replace(':', '')}00Z&details=${encodeURIComponent(c.servicio)}`;
 
         html += `
             <tr>
-                <td><strong>${escapeHtml(cita.nombre)}</strong></td>
-                <td>${escapeHtml(cita.servicio)}</td>
-                <td>${cita.fecha} - ${cita.hora} hrs</td>
-                <td>
-                    <select class="select-estado" onchange="cambiarEstadoCita('${cita.id}', this.value)">
-                        <option value="Pendiente" ${cita.estado === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
-                        <option value="Confirmada" ${cita.estado === 'Confirmada' ? 'selected' : ''}>Confirmada</option>
-                        <option value="Completada" ${cita.estado === 'Completada' ? 'selected' : ''}>Completada</option>
-                        <option value="Cancelada" ${cita.estado === 'Cancelada' ? 'selected' : ''}>Cancelada</option>
-                    </select>
-                </td>
-                <td>
-                    <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-                        <a href="${calendarUrl}" target="_blank" rel="noopener noreferrer" class="btn-sync-cal" title="Sincronizar esta hora a mi Google Calendar">
-                            📆 Sincronizar Google
-                        </a>
-                        <button class="btn-eliminar" onclick="eliminarCita('${cita.id}')">Eliminar</button>
-                    </div>
+                <td><strong>${escapeHTML(c.nombre)}</strong></td>
+                <td>${c.fecha} - ${c.hora} hrs</td>
+                <td>${escapeHTML(c.servicio)}</td>
+                <td style="display: flex; gap: 6px;">
+                    <a href="${googleCalUrl}" target="_blank" class="btn-sync-cal">📆 Google</a>
+                    <button type="button" class="btn-eliminar" onclick="eliminarCitaBarbero('${c.id}')">🗑️</button>
                 </td>
             </tr>
         `;
     });
 
-    html += `</tbody></table>`;
+    html += '</tbody></table>';
     contenedor.innerHTML = html;
 }
 
-function renderResenasBarbero() {
-    const contenedor = document.getElementById('contenedor-gestion-resenas');
+window.eliminarCitaBarbero = async (id) => {
+    if (confirm("¿Estás seguro de cancelar esta cita?")) {
+        await StorageManager.deleteCita(id);
+    }
+};
+
+window.cerrarSesionBarbero = () => {
+    localStorage.removeItem('barber_auth');
+    location.reload();
+};
+
+function verificarAutenticacionBarbero() {
+    const modal = document.getElementById('modal-auth');
+    const contenido = document.getElementById('contenido-barbero');
+    if (!modal || !contenido) return;
+
+    if (localStorage.getItem('barber_auth') === 'true') {
+        modal.style.display = 'none';
+        contenido.style.display = 'block';
+    } else {
+        modal.style.display = 'flex';
+        contenido.style.display = 'none';
+    }
+}
+
+// --- RESEÑAS ---
+function inicializarRatingStars() {
+    const starsContainer = document.getElementById('rating-stars');
+    if (!starsContainer) return;
+
+    const stars = starsContainer.querySelectorAll('.star');
+    stars.forEach(s => {
+        s.addEventListener('click', () => {
+            ratingValueGlobal = parseInt(s.getAttribute('data-value'));
+            stars.forEach((st, idx) => {
+                if (idx < ratingValueGlobal) st.classList.add('active');
+                else st.classList.remove('active');
+            });
+        });
+    });
+}
+
+function renderizarResenasCliente() {
+    const contenedor = document.getElementById('lista-resenas');
     if (!contenedor) return;
 
-    const resenas = StorageManager.getResenas();
-    if (resenas.length === 0) {
-        contenedor.innerHTML = '<p class="sin-datos">No hay reseñas registradas.</p>';
+    if (resenasEfectivas.length === 0) {
+        contenedor.innerHTML = '<p style="color: #9ca3af; font-size: 0.85rem;">Sé el primero en dejar una opinión.</p>';
         return;
     }
 
-    let html = `<div class="lista-gestion-resenas-barbero">`;
-
-    resenas.forEach(r => {
-        const estrellasHtml = '★'.repeat(r.calificacion);
+    let html = '';
+    resenasEfectivas.forEach(r => {
+        const estrellas = '★'.repeat(r.estrellas) + '☆'.repeat(5 - r.estrellas);
         html += `
-            <div class="card-resena-barbero" style="background: #03050a; border: 1px solid #182232; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <strong>${escapeHtml(r.nombre)} <span class="estrellas-render">(${estrellasHtml})</span></strong>
-                    <button class="btn-eliminar" onclick="eliminarResenaBarbero('${r.id}')">Borrar Reseña</button>
+            <div class="card-resena">
+                <div class="resena-header">
+                    <strong>${escapeHTML(r.nombre)}</strong>
+                    <span class="estrellas-render">${estrellas}</span>
                 </div>
-                <p style="font-style: italic; color: #cbd5e1; margin: 10px 0;">"${escapeHtml(r.comentario)}"</p>
-                
-                <div class="box-responder-resena" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #182232;">
-                    <label style="font-size: 0.85rem; color: #fbbf24; font-weight: 600; display: block; margin-bottom: 6px;">
-                        ${r.respuestaBarbero ? 'Editar tu respuesta pública:' : 'Escribe tu respuesta pública:'}
-                    </label>
-                    <textarea id="input-respuesta-${r.id}" placeholder="Escribe tu respuesta..." style="width: 100%; min-height: 60px; margin-bottom: 8px;">${r.respuestaBarbero ? escapeHtml(r.respuestaBarbero) : ''}</textarea>
-                    <button class="btn-publicar" style="width: auto; padding: 8px 16px; font-size: 0.85rem;" onclick="guardarRespuestaBarbero('${r.id}')">
-                        ${r.respuestaBarbero ? 'Actualizar Respuesta ✍️' : 'Publicar Respuesta 💬'}
-                    </button>
-                </div>
+                <p style="margin-top: 6px; font-size: 0.9rem;">${escapeHTML(r.comentario)}</p>
+                ${r.respuestaBarbero ? `
+                    <div class="respuesta-barbero-box">
+                        <strong style="color: #fbbf24; font-size: 0.8rem;">Respuesta del Barbero:</strong>
+                        <p style="font-size: 0.85rem; margin-top: 2px;">${escapeHTML(r.respuestaBarbero)}</p>
+                    </div>
+                ` : ''}
             </div>
         `;
     });
-
-    html += `</div>`;
     contenedor.innerHTML = html;
 }
 
-window.guardarRespuestaBarbero = function(id) {
-    const textarea = document.getElementById(`input-respuesta-${id}`);
-    if (!textarea) return;
+function renderizarGestionResenasBarbero() {
+    const contenedor = document.getElementById('contenedor-gestion-resenas');
+    if (!contenedor) return;
 
-    const textoRespuesta = Validator.trimInput(textarea.value);
-
-    if (StorageManager.updateResenaRespuesta(id, textoRespuesta)) {
-        alert('Respuesta guardada con éxito.');
-        renderResenasBarbero();
-        renderResenasCliente();
-    } else {
-        alert('Error al guardar la respuesta.');
+    if (resenasEfectivas.length === 0) {
+        contenedor.innerHTML = '<p style="color: #9ca3af;">No hay reseñas publicadas aún.</p>';
+        return;
     }
-};
 
-window.cambiarEstadoCita = function(id, nuevoEstado) {
-    StorageManager.updateCita(id, { estado: nuevoEstado });
-    renderClienteCalendar();
-};
-
-window.eliminarCita = function(id) {
-    if (confirm('¿Eliminar esta hora agendada?')) {
-        StorageManager.deleteCita(id);
-        renderCitasBarbero();
-        renderClienteCalendar();
-    }
-};
-
-window.eliminarResenaBarbero = function(id) {
-    if (confirm('¿Deseas borrar esta reseña del sistema?')) {
-        StorageManager.deleteResena(id);
-        renderResenasBarbero();
-        renderResenasCliente();
-    }
-};
-
-function initStorageListener() {
-    window.addEventListener('storage', (e) => {
-        if (e.key === 'yunghbarber_citas' || e.key === 'yunghbarber_bloqueos') {
-            renderCitasBarbero();
-            renderClienteCalendar();
-            renderBarberoCalendar();
-        }
-        if (e.key === 'yunghbarber_resenas') {
-            renderResenasCliente();
-            renderResenasBarbero();
-        }
+    let html = '';
+    resenasEfectivas.forEach(r => {
+        html += `
+            <div class="card-resena" style="margin-bottom: 12px;">
+                <strong>${escapeHTML(r.nombre)} (${r.estrellas} ★)</strong>
+                <p style="font-size: 0.9rem; margin: 4px 0;">"${escapeHTML(r.comentario)}"</p>
+                ${r.respuestaBarbero ? `
+                    <p style="color: #10b981; font-size: 0.85rem;"><strong>Tu Respuesta:</strong> ${escapeHTML(r.respuestaBarbero)}</p>
+                ` : `
+                    <div style="display: flex; gap: 8px; margin-top: 8px;">
+                        <input type="text" id="resp-input-${r.id}" placeholder="Escribe tu respuesta..." style="padding: 6px; font-size: 0.85rem;">
+                        <button type="button" class="btn-publicar" style="width: auto; padding: 6px 12px;" onclick="enviarRespuestaBarbero('${r.id}')">Responder</button>
+                    </div>
+                `}
+            </div>
+        `;
     });
+    contenedor.innerHTML = html;
 }
 
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+window.enviarRespuestaBarbero = async (id) => {
+    const input = document.getElementById(`resp-input-${id}`);
+    if (!input || !input.value.trim()) return;
+
+    await StorageManager.responderResena(id, input.value.trim());
+};
+
+// --- UTILS ---
+function formatDate(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function formatFechaLegible(d) {
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    return `${dias[d.getDay()]}, ${d.getDate()} De ${meses[d.getMonth()]}`;
+}
+
+function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>'"]/g, 
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+    );
 }
