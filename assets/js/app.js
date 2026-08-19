@@ -1,4 +1,5 @@
 import { StorageManager } from './storage.js';
+import { Validator } from './validator.js';
 
 let citasEfectivas = [];
 let bloqueosGlobales = {};
@@ -7,13 +8,12 @@ let fechaSeleccionadaGlobal = new Date();
 let ratingValueGlobal = 5;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Renderizar calendario INMEDIATAMENTE para evitar pantallas vacías
     inicializarCalendarios();
     inicializarFormularios();
     inicializarRatingStars();
     verificarAutenticacionBarbero();
 
-    // 2. Conectar las suscripciones de Firebase
+    // Suscripciones Firebase / Storage
     StorageManager.suscribirCitas((citas) => {
         citasEfectivas = citas;
         renderizarVistaActual();
@@ -37,7 +37,7 @@ function renderizarVistaActual() {
     renderizarTablaCitasBarbero();
 }
 
-// --- RENDERIZADO EXACTO DEL CALENDARIO (FOTO 2) ---
+// --- CALENDARIOS ---
 function inicializarCalendarios() {
     renderizarCalendario('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
     renderizarCalendario('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
@@ -79,8 +79,6 @@ function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInput
 
     const primerDiaMes = new Date(year, month, 1);
     const ultimoDiaMes = new Date(year, month + 1, 0).getDate();
-
-    const nombresMeses = ['Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio'];
     const nombreMesActual = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][month];
     
     if (monthTitle) monthTitle.textContent = `${nombreMesActual} De ${year}`;
@@ -88,7 +86,6 @@ function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInput
     let primerDiaSemanaIndex = primerDiaMes.getDay() - 1;
     if (primerDiaSemanaIndex === -1) primerDiaSemanaIndex = 6;
 
-    // Días del mes anterior (Tono oscuro/inactivo)
     const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
     for (let i = primerDiaSemanaIndex - 1; i >= 0; i--) {
         const div = document.createElement('div');
@@ -100,7 +97,6 @@ function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInput
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
-    // Días del mes actual
     for (let dia = 1; dia <= ultimoDiaMes; dia++) {
         const div = document.createElement('div');
         div.className = 'cal-day';
@@ -158,38 +154,80 @@ function renderizarHorariosCliente() {
 
 // --- FORMULARIOS ---
 function inicializarFormularios() {
-    const formAgenda = document.getElementById('form-agenda');
-    if (formAgenda) {
-        const btnsHora = formAgenda.querySelectorAll('.btn-hora');
-        btnsHora.forEach(btn => {
-            btn.onclick = () => {
-                if (btn.disabled) return;
-                btnsHora.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                document.getElementById('hora').value = btn.getAttribute('data-hora');
-            };
-        });
+    const modalDatos = document.getElementById('modal-datos-cliente');
+    const formDatosFinales = document.getElementById('form-datos-finales');
 
-        formAgenda.onsubmit = async (e) => {
+    // Confirmación y guardado de cita final
+    if (formDatosFinales) {
+        formDatosFinales.onsubmit = async (e) => {
             e.preventDefault();
-            const nombre = document.getElementById('nombre').value.trim();
-            const fecha = document.getElementById('fecha').value;
-            const hora = document.getElementById('hora').value;
-            const servicio = document.getElementById('servicio').value;
 
-            if (!hora) {
-                alert("Por favor selecciona una hora disponible.");
-                return;
+            const txtNombre = document.getElementById('cliente-nombre');
+            const txtTel = document.getElementById('cliente-telefono');
+            const txtCorreo = document.getElementById('cliente-correo');
+            const errNombre = document.getElementById('err-cliente-nombre');
+            const errTel = document.getElementById('err-cliente-telefono');
+            const errCorreo = document.getElementById('err-cliente-correo');
+
+            if (errNombre) errNombre.textContent = '';
+            if (errTel) errTel.textContent = '';
+            if (errCorreo) errCorreo.textContent = '';
+
+            const nombre = Validator.trimInput(txtNombre ? txtNombre.value : '');
+            const telefonoRestante = Validator.trimInput(txtTel ? txtTel.value : '');
+            const correo = Validator.trimInput(txtCorreo ? txtCorreo.value : '');
+            const fecha = document.getElementById('fecha') && document.getElementById('fecha').value ? document.getElementById('fecha').value : formatDate(fechaSeleccionadaGlobal);
+            const hora = document.getElementById('hora') ? document.getElementById('hora').value : '';
+            const servicio = document.getElementById('servicio') ? document.getElementById('servicio').value : '';
+
+            let hasError = false;
+
+            if (!Validator.validateRequired(nombre)) {
+                if (errNombre) errNombre.textContent = 'Ingresa tu nombre completo.';
+                hasError = true;
             }
 
-            const nuevaCita = { nombre, fecha, hora, servicio, fechaCreacion: new Date().toISOString() };
+            if (!Validator.validarTelefonoChileRestante(telefonoRestante)) {
+                if (errTel) errTel.textContent = 'Debe contener exactamente 8 dígitos tras el +56 9.';
+                hasError = true;
+            }
+
+            if (!Validator.validarEmailSimple(correo)) {
+                if (errCorreo) errCorreo.textContent = 'Ingresa un correo válido con "@".';
+                hasError = true;
+            }
+
+            if (hasError) return;
+
+            const btnConfirmar = document.getElementById('btn-confirmar-cita');
+            if (btnConfirmar) {
+                btnConfirmar.disabled = true;
+                btnConfirmar.textContent = 'Agendando...';
+            }
+
+            const nuevaCita = {
+                nombre,
+                telefono: `+569${telefonoRestante}`,
+                correo,
+                fecha,
+                hora,
+                servicio,
+                fechaCreacion: new Date().toISOString()
+            };
+
             const exito = await StorageManager.saveCita(nuevaCita);
+
+            if (btnConfirmar) {
+                btnConfirmar.disabled = false;
+                btnConfirmar.textContent = 'Confirmar y Agendar ✂️';
+            }
 
             if (exito) {
                 alert(`¡Hora agendada con éxito para el ${fecha} a las ${hora} hrs!`);
-                formAgenda.reset();
-                document.getElementById('hora').value = '';
-                btnsHora.forEach(b => b.classList.remove('active'));
+                formDatosFinales.reset();
+                if (modalDatos) modalDatos.style.display = 'none';
+                if (document.getElementById('hora')) document.getElementById('hora').value = '';
+                document.querySelectorAll('.btn-hora').forEach(b => b.classList.remove('active'));
             } else {
                 alert("Error al agendar la hora. Intenta nuevamente.");
             }
@@ -201,8 +239,13 @@ function inicializarFormularios() {
     if (formResena) {
         formResena.onsubmit = async (e) => {
             e.preventDefault();
-            const nombre = document.getElementById('resena-nombre').value.trim();
-            const comentario = document.getElementById('resena-comentario').value.trim();
+            const nombre = Validator.trimInput(document.getElementById('resena-nombre').value);
+            const comentario = Validator.trimInput(document.getElementById('resena-comentario').value);
+
+            if (!Validator.validateRequired(nombre) || !Validator.validateRequired(comentario)) {
+                alert("Por favor completa los campos de la reseña.");
+                return;
+            }
 
             const nuevaResena = {
                 nombre,
@@ -220,18 +263,77 @@ function inicializarFormularios() {
         };
     }
 
-    // Login Barbero con Clave 1234
+    // Formulario Login Barbero
     const formLogin = document.getElementById('form-login-barbero');
     if (formLogin) {
+        const txtEmail = document.getElementById('login-email');
+        const txtPass = document.getElementById('pin-ingresado');
+        const errEmail = document.getElementById('err-login-email');
+        const errPass = document.getElementById('err-login-pass');
+        const alertBox = document.getElementById('login-alert');
+        const btnSubmit = document.getElementById('btn-login-submit');
+
         formLogin.onsubmit = (e) => {
             e.preventDefault();
-            const pin = document.getElementById('pin-ingresado').value.trim();
-            if (pin === "1234") {
-                localStorage.setItem('barber_auth', 'true');
-                verificarAutenticacionBarbero();
-            } else {
-                alert("Clave incorrecta. Intenta nuevamente.");
+            if (errEmail) errEmail.textContent = '';
+            if (errPass) errPass.textContent = '';
+            if (alertBox) alertBox.className = 'alert d-none';
+
+            const email = Validator.trimInput(txtEmail ? txtEmail.value : '');
+            const pass = Validator.trimInput(txtPass ? txtPass.value : '');
+
+            let hasError = false;
+
+            if (!Validator.validateRequired(email)) {
+                if (errEmail) errEmail.textContent = 'El correo no puede estar en blanco.';
+                hasError = true;
+            } else if (!Validator.validarEmailSimple(email)) {
+                if (errEmail) errEmail.textContent = 'Debe incluir un "@" en el correo.';
+                hasError = true;
             }
+
+            if (!Validator.validateRequired(pass)) {
+                if (errPass) errPass.textContent = 'La clave no puede estar en blanco.';
+                hasError = true;
+            } else if (!Validator.validarPasswordCorta(pass)) {
+                if (errPass) errPass.textContent = 'La contraseña debe tener de 4 a 5 caracteres.';
+                hasError = true;
+            }
+
+            if (hasError) return;
+
+            if (btnSubmit) {
+                btnSubmit.disabled = true;
+                btnSubmit.textContent = 'Verificando...';
+            }
+
+            setTimeout(() => {
+                if (alertBox) {
+                    alertBox.textContent = '¡Acceso concedido! Cargando panel...';
+                    alertBox.className = 'alert alert-success';
+                }
+
+                localStorage.setItem('barber_auth', 'true');
+                localStorage.setItem('barber_user', email);
+
+                setTimeout(() => {
+                    verificarAutenticacionBarbero();
+                    if (btnSubmit) {
+                        btnSubmit.disabled = false;
+                        btnSubmit.textContent = 'Ingresar al Panel 🚀';
+                    }
+                }, 800);
+            }, 400);
+        };
+    }
+
+    // Salir del Panel
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+        btnLogout.onclick = () => {
+            localStorage.removeItem('barber_auth');
+            localStorage.removeItem('barber_user');
+            verificarAutenticacionBarbero();
         };
     }
 }
@@ -295,7 +397,7 @@ function renderizarTablaCitasBarbero() {
         <table class="tabla-gestion">
             <thead>
                 <tr>
-                    <th>Cliente</th>
+                    <th>Cliente / Contacto</th>
                     <th>Fecha / Hora</th>
                     <th>Servicio</th>
                     <th>Acciones</th>
@@ -305,11 +407,15 @@ function renderizarTablaCitasBarbero() {
     `;
 
     citasEfectivas.forEach(c => {
-        const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=Corte+Barberia+${encodeURIComponent(c.nombre)}&dates=${c.fecha.replace(/-/g, '')}T${c.hora.replace(':', '')}00Z/${c.fecha.replace(/-/g, '')}T${c.hora.replace(':', '')}00Z&details=${encodeURIComponent(c.servicio)}`;
+        const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=Corte+${encodeURIComponent(c.nombre)}&dates=${c.fecha.replace(/-/g, '')}T${c.hora.replace(':', '')}00Z/${c.fecha.replace(/-/g, '')}T${c.hora.replace(':', '')}00Z&details=${encodeURIComponent('Tel: ' + (c.telefono || '') + ' - ' + c.servicio)}`;
 
         html += `
             <tr>
-                <td><strong>${escapeHTML(c.nombre)}</strong></td>
+                <td>
+                    <strong>${escapeHTML(c.nombre)}</strong><br>
+                    <small style="color: #9ca3af;">📞 ${escapeHTML(c.telefono || 'Sin teléfono')}</small><br>
+                    <small style="color: #9ca3af;">✉️ ${escapeHTML(c.correo || 'Sin correo')}</small>
+                </td>
                 <td>${c.fecha} - ${c.hora} hrs</td>
                 <td>${escapeHTML(c.servicio)}</td>
                 <td style="display: flex; gap: 6px;">
@@ -328,11 +434,6 @@ window.eliminarCitaBarbero = async (id) => {
     if (confirm("¿Estás seguro de cancelar esta cita?")) {
         await StorageManager.deleteCita(id);
     }
-};
-
-window.cerrarSesionBarbero = () => {
-    localStorage.removeItem('barber_auth');
-    location.reload();
 };
 
 function verificarAutenticacionBarbero() {
@@ -429,7 +530,6 @@ function renderizarGestionResenasBarbero() {
 window.enviarRespuestaBarbero = async (id) => {
     const input = document.getElementById(`resp-input-${id}`);
     if (!input || !input.value.trim()) return;
-
     await StorageManager.responderResena(id, input.value.trim());
 };
 

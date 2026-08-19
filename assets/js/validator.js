@@ -1,64 +1,52 @@
 /**
- * Módulo de Validación de Datos y Reglas de Negocio
+ * Módulo de Validación de Datos y Reglas de Negocio - Yunghbarber
  */
 
-const Validator = {
+export const Validator = {
     /**
-     * Limpia y sanitiza una cadena de texto
-     * @param {string} str 
-     * @returns {string}
+     * Limpia y remueve espacios al inicio y al final
      */
     trimInput(str) {
         return typeof str === 'string' ? str.trim() : '';
     },
 
     /**
-     * Valida que una fecha u hora no sea pasada en comparación a la fecha actual
-     * @param {string} fechaStr Formato YYYY-MM-DD
-     * @param {string} horaStr Formato HH:MM
-     * @returns {Object} { isValid: boolean, message: string }
+     * Valida que un campo no esté vacío ni contenga solo espacios
      */
-    validarFechaHoraFutura(fechaStr, horaStr) {
-        if (!fechaStr || !horaStr) {
-            return { isValid: false, message: 'Debe seleccionar una fecha y hora válidas.' };
-        }
-
-        const fechaCita = new Date(`${fechaStr}T${horaStr}`);
-        const ahora = new Date();
-
-        if (isNaN(fechaCita.getTime())) {
-            return { isValid: false, message: 'El formato de fecha u hora es inválido.' };
-        }
-
-        if (fechaCita < ahora) {
-            return { isValid: false, message: 'No puedes agendar una cita en una fecha u hora pasada.' };
-        }
-
-        return { isValid: true, message: '' };
+    validateRequired(str) {
+        if (!str) return false;
+        return this.trimInput(str).length > 0;
     },
 
     /**
-     * Verifica si existe una colisión de horario (Double Booking)
-     * @param {string} servicioBarbero Opcional si se valida por barbero específico
-     * @param {string} fecha YYYY-MM-DD
-     * @param {string} hora HH:MM
-     * @param {Array} citasExistentes Array de citas actuales en Storage
-     * @returns {boolean} true si hay conflicto
+     * Validación de correo: debe contener '@' y al menos 3 caracteres
      */
-    existeConflictoHorario(barbero, fecha, hora, citasExistentes) {
-        return citasExistentes.some(cita => {
-            // Ignorar citas canceladas
-            if (cita.estado === 'Cancelada') return false;
-            
-            const mismoBarbero = barbero ? cita.barbero === barbero : true;
-            return mismoBarbero && cita.fecha === fecha && cita.hora === hora;
-        });
+    validarEmailSimple(email) {
+        if (!email) return false;
+        const clean = this.trimInput(email);
+        return clean.includes('@') && clean.length >= 3;
     },
 
     /**
-     * Valida la estructura básica de un correo electrónico
-     * @param {string} email 
-     * @returns {boolean}
+     * Valida que la contraseña tenga entre 4 y 5 caracteres
+     */
+    validarPasswordCorta(pass) {
+        if (!pass) return false;
+        const clean = this.trimInput(pass);
+        return clean.length >= 4 && clean.length <= 5;
+    },
+
+    /**
+     * Valida los 8 dígitos restantes del número chileno (después del +56 9)
+     */
+    validarTelefonoChileRestante(tel) {
+        if (!tel) return false;
+        const clean = this.trimInput(tel);
+        return /^\d{8}$/.test(clean);
+    },
+
+    /**
+     * Valida formato de correo estándar
      */
     validarEmail(email) {
         const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,12 +54,36 @@ const Validator = {
     },
 
     /**
-     * Valida un número de teléfono básico (mínimo 8 dígitos)
-     * @param {string} telefono 
-     * @returns {boolean}
+     * Valida que una fecha y hora no sean pasadas
      */
-    validarTelefono(telefono) {
-        const re = /^[0-9+ ]{8,15}$/;
-        return re.test(telefono);
+    validarFechaHoraFutura(fechaStr, horaStr) {
+        if (!fechaStr || !horaStr) {
+            return { isValid: false, message: 'Debe seleccionar una fecha y hora válidas.' };
+        }
+        const fechaCita = new Date(`${fechaStr}T${horaStr}`);
+        const ahora = new Date();
+        if (isNaN(fechaCita.getTime())) {
+            return { isValid: false, message: 'El formato de fecha u hora es inválido.' };
+        }
+        if (fechaCita < ahora) {
+            return { isValid: false, message: 'No puedes agendar una cita en una fecha u hora pasada.' };
+        }
+        return { isValid: true, message: '' };
+    },
+
+    /**
+     * Verifica colisiones de horario
+     */
+    existeConflictoHorario(barbero, fecha, hora, citasExistentes) {
+        return citasExistentes.some(cita => {
+            if (cita.estado === 'Cancelada') return false;
+            const mismoBarbero = barbero ? cita.barbero === barbero : true;
+            return mismoBarbero && cita.fecha === fecha && cita.hora === hora;
+        });
     }
 };
+
+// Exportación global para pruebas unitarias en consola F12
+if (typeof window !== 'undefined') {
+    window.Validator = Validator;
+}

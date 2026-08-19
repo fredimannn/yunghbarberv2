@@ -17,20 +17,15 @@
     </header>
 
     <main class="contenedor-principal">
-        <!-- Formulario de Agendamiento -->
+        <!-- Paso 1: Selección de Fecha, Horario y Servicio -->
         <section class="card-box">
-            <form id="form-agenda">
-                <div class="campo">
-                    <label for="nombre">Nombre Completo:</label>
-                    <input type="text" id="nombre" name="nombre" placeholder="Tu Nombre" required>
-                </div>
-
-                <!-- Calendario Interactivo Idéntico -->
+            <form id="form-agenda" novalidate onsubmit="return false;">
+                <!-- Calendario Interactivo -->
                 <div class="campo">
                     <label>Seleccionar Fecha:</label>
                     <div class="calendar-widget" id="client-calendar-widget">
                         <div class="cal-header-selected" id="cal-selected-label">
-                            Miércoles, 12 De Agosto
+                            Martes, 18 De Agosto
                         </div>
                         
                         <div class="cal-nav-bar">
@@ -48,7 +43,7 @@
                         <div class="cal-days-grid" id="cal-days-grid"></div>
                     </div>
 
-                    <input type="hidden" id="fecha" name="fecha" required>
+                    <input type="hidden" id="fecha" name="fecha" value="2026-08-18">
                 </div>
 
                 <!-- Selección de Horario -->
@@ -65,19 +60,21 @@
                         <button type="button" class="btn-hora" data-hora="19:00">19:00 hrs</button>
                         <button type="button" class="btn-hora" data-hora="20:00">20:00 hrs</button>
                     </div>
-                    <input type="hidden" id="hora" name="hora" required>
+                    <input type="hidden" id="hora" name="hora">
+                    <small id="err-hora" class="error-msg"></small>
                 </div>
 
+                <!-- Selección de Servicio -->
                 <div class="campo">
                     <label for="servicio">Servicio:</label>
-                    <select id="servicio" name="servicio" required>
+                    <select id="servicio" name="servicio">
                         <option value="Corte Moderno / Degradado ($10.000)">Corte Moderno / Degradado ($10.000)</option>
                         <option value="Perfilado de Barba ($5.000)">Perfilado de Barba ($5.000)</option>
                         <option value="Corte + Barba ($13.000)">Corte + Barba ($13.000)</option>
                     </select>
                 </div>
 
-                <button type="submit" class="btn-confirmar">Agendar Hora 🚀</button>
+                <button type="button" id="btn-abrir-modal" class="btn-confirmar">Continuar con la Reserva 🚀</button>
             </form>
         </section>
 
@@ -123,6 +120,110 @@
             <div id="lista-resenas" class="lista-resenas-container"></div>
         </section>
     </main>
+
+    <!-- Modal Paso 2: Datos de Contacto del Cliente -->
+    <div id="modal-datos-cliente" class="modal-auth-container" style="display: none;">
+        <div class="card-box card-auth">
+            <h2>💈 Confirmar Datos</h2>
+            <p id="resumen-reserva-txt" style="color: #fbbf24; font-size: 0.9rem; margin-top: 6px;"></p>
+            
+            <form id="form-datos-finales" style="margin-top: 15px;" novalidate>
+                <div class="campo">
+                    <label for="cliente-nombre" style="text-align: left;">Nombre Completo:</label>
+                    <input type="text" id="cliente-nombre" placeholder="Ej: Juanito Pérez" autocomplete="off" required>
+                    <small id="err-cliente-nombre" class="error-msg"></small>
+                </div>
+
+                <div class="campo">
+                    <label for="cliente-telefono" style="text-align: left;">Teléfono / WhatsApp (Chile):</label>
+                    <!-- Contenedor horizontal bloqueado con inline-style para máxima prioridad -->
+                    <div class="input-tel-container" style="display: flex !important; flex-direction: row !important; align-items: center !important; background-color: #03050a !important; border: 1px solid #182232 !important; border-radius: 8px !important; overflow: hidden !important; width: 100% !important;">
+                        <span class="prefijo-box" style="background-color: #0e1624 !important; color: #fbbf24 !important; font-weight: bold !important; font-size: 0.95rem !important; padding: 12px 14px !important; border-right: 1px solid #182232 !important; white-space: nowrap !important; user-select: none !important;">+56 9</span>
+                        <input 
+                            type="text" 
+                            id="cliente-telefono" 
+                            placeholder="12345678" 
+                            maxlength="8" 
+                            autocomplete="off"
+                            style="background-color: transparent !important; border: none !important; color: #ffffff !important; padding: 12px !important; border-radius: 0 !important; outline: none !important; font-size: 0.95rem !important; width: 100% !important; flex: 1 !important;"
+                            required
+                        >
+                    </div>
+                    <small id="err-cliente-telefono" class="error-msg"></small>
+                </div>
+
+                <div class="campo">
+                    <label for="cliente-correo" style="text-align: left;">Correo Electrónico:</label>
+                    <input type="text" id="cliente-correo" placeholder="cliente@correo.com" autocomplete="off" required>
+                    <small id="err-cliente-correo" class="error-msg"></small>
+                </div>
+
+                <button type="submit" id="btn-confirmar-cita" class="btn-confirmar">Confirmar y Agendar ✂️</button>
+                <button type="button" id="btn-cerrar-modal" class="btn-cancelar-modal" style="width: 100% !important; background-color: #0e1624 !important; border: 1px solid #1a2536 !important; color: #9ca3af !important; padding: 10px 14px !important; border-radius: 8px !important; cursor: pointer !important; font-size: 0.85rem !important; margin-top: 10px !important;">Volver / Modificar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script Nativo para la Vista y Modal -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnsHora = document.querySelectorAll('.btn-hora');
+            const inputHora = document.getElementById('hora');
+            const errHora = document.getElementById('err-hora');
+            const btnAbrir = document.getElementById('btn-abrir-modal');
+            const modal = document.getElementById('modal-datos-cliente');
+            const btnCerrar = document.getElementById('btn-cerrar-modal');
+            const txtResumen = document.getElementById('resumen-reserva-txt');
+            const txtTel = document.getElementById('cliente-telefono');
+
+            // 1. Selección de Horas
+            btnsHora.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (btn.disabled) return;
+                    btnsHora.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    if (inputHora) inputHora.value = btn.getAttribute('data-hora');
+                    if (errHora) errHora.textContent = '';
+                });
+            });
+
+            // 2. Abrir Modal
+            if (btnAbrir) {
+                btnAbrir.addEventListener('click', () => {
+                    const horaSeleccionada = inputHora ? inputHora.value : '';
+                    if (!horaSeleccionada) {
+                        if (errHora) errHora.textContent = '⚠️ Selecciona un horario disponible antes de continuar.';
+                        return;
+                    }
+
+                    const fecha = document.getElementById('fecha') ? document.getElementById('fecha').value : '2026-08-18';
+                    const servicio = document.getElementById('servicio') ? document.getElementById('servicio').value : '';
+
+                    if (txtResumen) {
+                        txtResumen.textContent = `📅 ${fecha} | ⏰ ${horaSeleccionada} hrs | ✂️ ${servicio}`;
+                    }
+
+                    if (modal) {
+                        modal.style.display = 'flex';
+                    }
+                });
+            }
+
+            // 3. Cerrar Modal
+            if (btnCerrar && modal) {
+                btnCerrar.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+            }
+
+            // 4. Solo permitir números en el teléfono (8 dígitos restantes tras el +56 9)
+            if (txtTel) {
+                txtTel.addEventListener('input', (e) => {
+                    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
+                });
+            }
+        });
+    </script>
 
     <script type="module" src="assets/js/app.js"></script>
 </body>

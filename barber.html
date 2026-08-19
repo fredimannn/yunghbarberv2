@@ -8,17 +8,40 @@
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <!-- Modal de Autenticación / PIN de Seguridad (Clave: 1234) -->
+    <!-- Modal de Autenticación / Login de Barbero -->
     <div id="modal-auth" class="modal-auth-container">
         <div class="card-box card-auth">
             <h2>🔒 Acceso Restringido</h2>
-            <p style="color: #9ca3af; font-size: 0.9rem; margin-top: 6px;">Ingresa la clave para acceder al panel del barbero:</p>
+            <p style="color: #9ca3af; font-size: 0.9rem; margin-top: 6px;">Ingresa tus credenciales para acceder al panel:</p>
             
-            <form id="form-login-barbero" style="margin-top: 15px;">
+            <form id="form-login-barbero" style="margin-top: 15px;" novalidate>
                 <div class="campo">
-                    <input type="password" id="pin-ingresado" placeholder="Clave (1234)" maxlength="10" required style="text-align: center; font-size: 1.2rem; letter-spacing: 2px;">
+                    <label for="login-email" style="text-align: left;">Correo electrónico:</label>
+                    <input 
+                        type="text" 
+                        id="login-email" 
+                        placeholder="barbero@yungh.cl" 
+                        autocomplete="off"
+                        required
+                    >
+                    <small id="err-login-email" class="error-msg"></small>
                 </div>
-                <button type="submit" class="btn-confirmar">Ingresar al Panel 🚀</button>
+
+                <div class="campo">
+                    <label for="pin-ingresado" style="text-align: left;">Contraseña (4 a 5 caracteres):</label>
+                    <input 
+                        type="password" 
+                        id="pin-ingresado" 
+                        placeholder="••••" 
+                        maxlength="5" 
+                        required
+                    >
+                    <small id="err-login-pass" class="error-msg"></small>
+                </div>
+
+                <div id="login-alert" class="alert d-none"></div>
+
+                <button type="submit" id="btn-login-submit" class="btn-confirmar">Ingresar al Panel 🚀</button>
             </form>
             
             <div style="margin-top: 15px; text-align: center;">
@@ -35,7 +58,7 @@
                 <p>Panel Administrativo</p>
             </div>
             <div class="header-acciones">
-                <button type="button" onclick="cerrarSesionBarbero()" class="btn-eliminar btn-salir-barber">🔒 Salir</button>
+                <button type="button" id="btn-logout" class="btn-eliminar btn-salir-barber">🔒 Salir</button>
                 <a href="index.html" class="btn-panel btn-volver-app">Volver a la App 🏠</a>
             </div>
         </header>
@@ -50,7 +73,7 @@
                     <label>Seleccionar Fecha a Configurar:</label>
                     <div class="calendar-widget" id="barber-calendar-widget">
                         <div class="cal-header-selected" id="barber-cal-selected-label">
-                            Miércoles, 12 De Agosto
+                            Martes, 18 De Agosto
                         </div>
                         
                         <div class="cal-nav-bar">
