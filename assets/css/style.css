@@ -80,7 +80,7 @@ body {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
 }
 
-/* Contenedores y campos */
+/* Contenedores y estructura */
 .contenedor-principal {
     max-width: 600px;
     margin: 30px auto;
@@ -125,7 +125,7 @@ select:focus, input:focus, textarea:focus {
     border-color: #fbbf24;
 }
 
-/* Teléfono nacional chileno */
+/* Formato para teléfono chileno */
 .input-tel-container {
     display: flex;
     align-items: center;
@@ -312,7 +312,7 @@ select:focus, input:focus, textarea:focus {
     font-weight: 800;
 }
 
-/* Indicador de día tomado en el calendario */
+/* Indicador de día libre en el calendario */
 .cal-day.dia-libre {
     border: 1px solid #ef4444 !important;
     color: #fca5a5 !important;
@@ -348,7 +348,7 @@ select:focus, input:focus, textarea:focus {
     background-color: #1a160d;
 }
 
-/* HORAS BLOQUEADAS O TOMADAS PARA EL CLIENTE: EN GRIS Y TACHADAS */
+/* Horas ocupadas o bloqueadas para el cliente */
 .btn-hora:disabled, .btn-hora.ocupado {
     background-color: #111827 !important;
     border-color: #1f2937 !important;
@@ -358,7 +358,7 @@ select:focus, input:focus, textarea:focus {
     text-decoration: line-through !important;
 }
 
-/* Switch y horas del barbero */
+/* Controles de disponibilidad del barbero */
 .box-bloqueo-dia {
     background-color: #03050a;
     border: 1px solid #182232;
@@ -385,24 +385,33 @@ select:focus, input:focus, textarea:focus {
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin-top: 10px;
+    position: relative;
+    z-index: 10;
 }
 
 .btn-hora-barbero {
     background-color: #03050a;
     border: 1px solid #10b981;
     color: #10b981;
-    padding: 10px;
+    padding: 12px 10px;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 600;
-    transition: all 0.2s;
+    font-size: 0.9rem;
+    transition: all 0.15s ease;
+    user-select: none;
 }
 
-/* HORA BLOQUEADA POR EL BARBERO: EN ROJO Y TACHADA */
+.btn-hora-barbero:hover {
+    background-color: #064e3b;
+    color: #ffffff;
+}
+
+/* Hora bloqueada por el barbero: roja y tachada */
 .btn-hora-barbero.bloqueada-barbero {
     border-color: #ef4444 !important;
     color: #fca5a5 !important;
-    background-color: rgba(239, 68, 68, 0.15) !important;
+    background-color: rgba(239, 68, 68, 0.2) !important;
     text-decoration: line-through !important;
 }
 
