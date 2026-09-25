@@ -126,7 +126,7 @@ function dibujarMes(gridId, titleId, labelId, inputId) {
     }
 }
 
-// Vista del cliente: Muestra únicamente (No Disponible) sin hora en gris
+// 1. VISTA CLIENTE: Si está bloqueada o tomada, muestra SOLO "(No Disponible)" sin hora
 function dibujarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
     if (!contenedor) return;
@@ -152,7 +152,7 @@ function dibujarHorariosCliente() {
     });
 }
 
-// Vista del barbero: Muestra (Dia Tomado) sin número de hora al bloquearse
+// 2. VISTA BARBERO: Al marcar una hora, muestra SOLO "(Dia Tomado)" sin el número
 function dibujarPanelDisponibilidad() {
     const checkDia = document.getElementById('check-bloquear-dia');
     const gridHoras = document.getElementById('grid-horas-barbero');
@@ -212,6 +212,49 @@ function dibujarPanelDisponibilidad() {
         gridHoras.appendChild(btn);
     });
 }
+
+// 3. VISTA RESEÑAS BARBERO: Con botón 🗑️ para borrarlas
+function dibujarResenasBarbero() {
+    const cont = document.getElementById('contenedor-gestion-resenas');
+    if (!cont) return;
+
+    if (resenas.length === 0) {
+        cont.innerHTML = '<p style="color: #9ca3af;">No hay opiniones registradas.</p>';
+        return;
+    }
+
+    cont.innerHTML = resenas.map(r => `
+        <div class="card-resena" style="margin-bottom: 12px; position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <strong>${escapar(r.nombre)} (${r.estrellas} ★)</strong>
+                    <p style="font-size: 0.9rem; margin: 4px 0;">"${escapar(r.comentario)}"</p>
+                </div>
+                <button type="button" class="btn-eliminar" onclick="window.borrarResena('${r.id}')" title="Eliminar reseña" style="padding: 4px 8px; font-size: 0.85rem; cursor: pointer;">🗑️</button>
+            </div>
+            ${r.respuestaBarbero ? `
+                <p style="color: #10b981; font-size: 0.85rem; margin-top: 6px;"><strong>Tu Respuesta:</strong> ${escapar(r.respuestaBarbero)}</p>
+            ` : `
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <input type="text" id="resp-${r.id}" placeholder="Escribe tu respuesta..." style="padding: 6px; font-size: 0.85rem;">
+                    <button type="button" class="btn-publicar" style="width: auto; padding: 6px 12px;" onclick="window.enviarRespuesta('${r.id}')">Responder</button>
+                </div>
+            `}
+        </div>
+    `).join('');
+}
+
+window.borrarResena = async (id) => {
+    if (confirm('¿Deseas eliminar esta reseña?')) {
+        await StorageManager.deleteResena(id);
+    }
+};
+
+window.enviarRespuesta = async (id) => {
+    const txt = document.getElementById(`resp-${id}`)?.value.trim();
+    if (!txt) return;
+    await StorageManager.responderResena(id, txt);
+};
 
 function configurarFormularios() {
     const fReserva = document.getElementById('form-datos-finales');
@@ -369,7 +412,7 @@ function dibujarTablaReservas() {
             <td>${c.fecha} - ${c.hora} hrs</td>
             <td>${escapar(c.servicio)}</td>
             <td>
-                <button type="button" class="btn-eliminar" onclick="borrarCita('${c.id}')" title="Cancelar Cita">🗑️</button>
+                <button type="button" class="btn-eliminar" onclick="window.borrarCita('${c.id}')" title="Cancelar Cita">🗑️</button>
             </td>
         </tr>
     `).join('');
@@ -444,49 +487,6 @@ function dibujarResenasCliente() {
         </div>
     `).join('');
 }
-
-// Sección de gestión con botón de papelera para eliminar opiniones
-function dibujarResenasBarbero() {
-    const cont = document.getElementById('contenedor-gestion-resenas');
-    if (!cont) return;
-
-    if (resenas.length === 0) {
-        cont.innerHTML = '<p style="color: #9ca3af;">No hay opiniones registradas.</p>';
-        return;
-    }
-
-    cont.innerHTML = resenas.map(r => `
-        <div class="card-resena" style="margin-bottom: 12px; position: relative;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <strong>${escapar(r.nombre)} (${r.estrellas} ★)</strong>
-                    <p style="font-size: 0.9rem; margin: 4px 0;">"${escapar(r.comentario)}"</p>
-                </div>
-                <button type="button" class="btn-eliminar" onclick="borrarResena('${r.id}')" title="Eliminar reseña" style="padding: 5px 9px; font-size: 0.85rem; cursor: pointer;">🗑️</button>
-            </div>
-            ${r.respuestaBarbero ? `
-                <p style="color: #10b981; font-size: 0.85rem; margin-top: 6px;"><strong>Tu Respuesta:</strong> ${escapar(r.respuestaBarbero)}</p>
-            ` : `
-                <div style="display: flex; gap: 8px; margin-top: 8px;">
-                    <input type="text" id="resp-${r.id}" placeholder="Escribe tu respuesta..." style="padding: 6px; font-size: 0.85rem;">
-                    <button type="button" class="btn-publicar" style="width: auto; padding: 6px 12px;" onclick="enviarRespuesta('${r.id}')">Responder</button>
-                </div>
-            `}
-        </div>
-    `).join('');
-}
-
-window.borrarResena = async (id) => {
-    if (confirm('¿Seguro que deseas eliminar esta reseña?')) {
-        await StorageManager.deleteResena(id);
-    }
-};
-
-window.enviarRespuesta = async (id) => {
-    const txt = document.getElementById(`resp-${id}`)?.value.trim();
-    if (!txt) return;
-    await StorageManager.responderResena(id, txt);
-};
 
 function formatearISO(d) {
     const y = d.getFullYear();
