@@ -312,7 +312,20 @@ select:focus, input:focus, textarea:focus {
     font-weight: 800;
 }
 
-/* Grillas de horas */
+/* Indicador de día tomado en el calendario */
+.cal-day.dia-libre {
+    border: 1px solid #ef4444 !important;
+    color: #fca5a5 !important;
+    text-decoration: line-through;
+}
+
+.cal-day.dia-libre.selected {
+    background-color: #ef4444 !important;
+    color: #ffffff !important;
+    text-decoration: none;
+}
+
+/* Grilla de horas cliente */
 .grid-horarios {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -335,16 +348,17 @@ select:focus, input:focus, textarea:focus {
     background-color: #1a160d;
 }
 
+/* HORAS BLOQUEADAS O TOMADAS PARA EL CLIENTE: EN GRIS Y TACHADAS */
 .btn-hora:disabled, .btn-hora.ocupado {
-    background-color: #0e1624 !important;
-    border-color: #182232 !important;
-    color: #3b4c66 !important;
+    background-color: #111827 !important;
+    border-color: #1f2937 !important;
+    color: #6b7280 !important;
     cursor: not-allowed !important;
-    opacity: 0.6;
-    text-decoration: line-through;
+    opacity: 0.65;
+    text-decoration: line-through !important;
 }
 
-/* Switch y control de horas barbero */
+/* Switch y horas del barbero */
 .box-bloqueo-dia {
     background-color: #03050a;
     border: 1px solid #182232;
@@ -384,11 +398,12 @@ select:focus, input:focus, textarea:focus {
     transition: all 0.2s;
 }
 
+/* HORA BLOQUEADA POR EL BARBERO: EN ROJO Y TACHADA */
 .btn-hora-barbero.bloqueada-barbero {
-    border-color: #ef4444;
-    color: #ef4444;
-    background-color: rgba(239, 68, 68, 0.1);
-    text-decoration: line-through;
+    border-color: #ef4444 !important;
+    color: #fca5a5 !important;
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    text-decoration: line-through !important;
 }
 
 /* Botones de acción */
@@ -514,7 +529,6 @@ select:focus, input:focus, textarea:focus {
     border-radius: 6px;
 }
 
-/* Tabla de reservas */
 .tabla-gestion {
     width: 100%;
     border-collapse: collapse;

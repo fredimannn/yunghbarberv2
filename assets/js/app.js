@@ -7,7 +7,7 @@ let resenas = [];
 let fechaSeleccionada = new Date();
 let ratingEstrellas = 5;
 
-const HORARIOS_DISPONIBLES = ["10:00", "11:00", "12:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
+const HORARIOS_JORNADA = ["10:00", "11:00", "12:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
 
 document.addEventListener('DOMContentLoaded', () => {
     configurarCalendarios();
@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarEstrellas();
     comprobarAccesoBarbero();
 
-    // Conexión de datos
+    // Sincronización en tiempo real
     StorageManager.suscribirCitas((data) => {
         citas = data;
         actualizarPantalla();
@@ -31,23 +31,27 @@ document.addEventListener('DOMContentLoaded', () => {
         dibujarResenasCliente();
         dibujarResenasBarbero();
     });
+
+    // Detecta cambios si el barbero bloquea horas en otra pestaña
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'local_bloqueos') {
+            bloqueos = JSON.parse(e.newValue || '{}');
+            actualizarPantalla();
+        }
+    });
 });
 
 function actualizarPantalla() {
+    dibujarMes('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
+    dibujarMes('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
     dibujarHorariosCliente();
     dibujarPanelDisponibilidad();
     dibujarTablaReservas();
 }
 
-// Generación y navegación de días del calendario
+// Calendario interactivo
 function configurarCalendarios() {
-    const render = () => {
-        dibujarMes('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
-        dibujarMes('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
-        actualizarPantalla();
-    };
-
-    render();
+    actualizarPantalla();
 
     const vincularBotones = (prevId, nextId) => {
         const btnPrev = document.getElementById(prevId);
@@ -55,11 +59,11 @@ function configurarCalendarios() {
         if (btnPrev && btnNext) {
             btnPrev.onclick = () => {
                 fechaSeleccionada.setMonth(fechaSeleccionada.getMonth() - 1);
-                render();
+                actualizarPantalla();
             };
             btnNext.onclick = () => {
                 fechaSeleccionada.setMonth(fechaSeleccionada.getMonth() + 1);
-                render();
+                actualizarPantalla();
             };
         }
     };
@@ -103,10 +107,15 @@ function dibujarMes(gridId, titleId, labelId, inputId) {
 
         const fechaDia = new Date(year, month, d);
         const fStr = formatearISO(fechaDia);
+        const estaBloqueadoDia = bloqueos[fStr]?.bloqueadoCompleto === true;
 
         if (fechaDia < hoy) {
             celda.classList.add('disabled');
         } else {
+            if (estaBloqueadoDia) {
+                celda.classList.add('dia-libre');
+            }
+
             if (fStr === formatearISO(fechaSeleccionada)) {
                 celda.classList.add('selected');
                 if (input) input.value = fStr;
@@ -115,8 +124,6 @@ function dibujarMes(gridId, titleId, labelId, inputId) {
 
             celda.onclick = () => {
                 fechaSeleccionada = new Date(year, month, d);
-                dibujarMes('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
-                dibujarMes('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
                 actualizarPantalla();
             };
         }
@@ -124,26 +131,33 @@ function dibujarMes(gridId, titleId, labelId, inputId) {
     }
 }
 
-// Bloque de horas para el cliente
+// Vista de cliente: pone en gris las horas tomadas o bloqueadas
 function dibujarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
     if (!contenedor) return;
 
     const fechaHoy = formatearISO(fechaSeleccionada);
     const cfg = bloqueos[fechaHoy] || { bloqueadoCompleto: false, horasBloqueadas: [] };
-    const ocupadas = citas.filter(c => c.fecha === fechaHoy).map(c => c.hora);
+    const citasOcupadas = citas.filter(c => c.fecha === fechaHoy).map(c => c.hora);
 
     contenedor.querySelectorAll('.btn-hora').forEach(btn => {
         const hora = btn.dataset.hora;
-        const noDisponible = cfg.bloqueadoCompleto || (cfg.horasBloqueadas && cfg.horasBloqueadas.includes(hora)) || ocupadas.includes(hora);
+        const ocupadaPorCliente = citasOcupadas.includes(hora);
+        const bloqueadaPorBarbero = cfg.bloqueadoCompleto || (Array.isArray(cfg.horasBloqueadas) && cfg.horasBloqueadas.includes(hora));
 
-        btn.disabled = noDisponible;
-        btn.classList.toggle('ocupado', noDisponible);
-        btn.textContent = noDisponible ? `${hora} (No Disp.)` : `${hora} hrs`;
+        if (bloqueadaPorBarbero || ocupadaPorCliente) {
+            btn.disabled = true;
+            btn.classList.add('ocupado');
+            btn.textContent = bloqueadaPorBarbero ? `${hora} (No Disp.)` : `${hora} (Tomado)`;
+        } else {
+            btn.disabled = false;
+            btn.classList.remove('ocupado');
+            btn.textContent = `${hora} hrs`;
+        }
     });
 }
 
-// Control del barbero: bloquear horas individuales o día entero
+// Vista del barbero: marca las horas que NO trabaja en rojo tachado
 function dibujarPanelDisponibilidad() {
     const checkDia = document.getElementById('check-bloquear-dia');
     const gridHoras = document.getElementById('grid-horas-barbero');
@@ -166,13 +180,12 @@ function dibujarPanelDisponibilidad() {
     checkDia.onchange = async () => {
         cfg.bloqueadoCompleto = checkDia.checked;
         bloqueos[fechaHoy] = cfg;
-        dibujarPanelDisponibilidad();
-        dibujarHorariosCliente();
+        actualizarPantalla();
         await StorageManager.saveBloqueoFecha(fechaHoy, cfg);
     };
 
     gridHoras.innerHTML = '';
-    HORARIOS_DISPONIBLES.forEach(hora => {
+    HORARIOS_JORNADA.forEach(hora => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn-hora-barbero';
@@ -180,11 +193,12 @@ function dibujarPanelDisponibilidad() {
         const bloqueada = Array.isArray(cfg.horasBloqueadas) && cfg.horasBloqueadas.includes(hora);
         if (bloqueada) {
             btn.classList.add('bloqueada-barbero');
-            btn.textContent = `${hora} (No Disp.)`;
+            btn.textContent = `${hora} (Tomado / No laborable)`;
         } else {
             btn.textContent = `${hora} hrs`;
         }
 
+        // Click instantáneo para bloquear o desbloquear
         btn.onclick = async () => {
             if (!Array.isArray(cfg.horasBloqueadas)) cfg.horasBloqueadas = [];
 
@@ -195,8 +209,7 @@ function dibujarPanelDisponibilidad() {
             }
 
             bloqueos[fechaHoy] = cfg;
-            dibujarPanelDisponibilidad();
-            dibujarHorariosCliente();
+            actualizarPantalla();
             await StorageManager.saveBloqueoFecha(fechaHoy, cfg);
         };
 
@@ -204,9 +217,7 @@ function dibujarPanelDisponibilidad() {
     });
 }
 
-// Formularios de reserva, reseñas y acceso barbero
 function configurarFormularios() {
-    // Enviar reserva
     const fReserva = document.getElementById('form-datos-finales');
     if (fReserva) {
         fReserva.onsubmit = async (e) => {
@@ -272,7 +283,6 @@ function configurarFormularios() {
         };
     }
 
-    // Publicar opinión
     const fResena = document.getElementById('form-resena');
     if (fResena) {
         fResena.onsubmit = async (e) => {
@@ -298,7 +308,6 @@ function configurarFormularios() {
         };
     }
 
-    // Login barbero
     const fLogin = document.getElementById('form-login-barbero');
     if (fLogin) {
         fLogin.onsubmit = (e) => {
@@ -345,7 +354,6 @@ function configurarFormularios() {
     }
 }
 
-// Citas en panel administrativo
 function dibujarTablaReservas() {
     const contenedor = document.getElementById('contenedor-citas');
     if (!contenedor) return;
@@ -472,7 +480,6 @@ window.enviarRespuesta = async (id) => {
     await StorageManager.responderResena(id, txt);
 };
 
-// Formato de fechas y seguridad
 function formatearISO(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
