@@ -68,7 +68,7 @@ export const StorageManager = {
         try {
             await addDoc(collection(db, "citas"), cita);
         } catch (e) {
-            console.warn("Cita guardada en modo local.");
+            console.warn("Cita almacenada localmente.");
         }
         return true;
     },
@@ -81,7 +81,7 @@ export const StorageManager = {
         try {
             await setDoc(doc(db, "bloqueos", fecha), config);
         } catch (e) {
-            console.warn("Bloqueo guardado en modo local.");
+            console.warn("Bloqueo almacenado localmente.");
         }
         return true;
     },
@@ -114,7 +114,6 @@ export const StorageManager = {
         }
     },
 
-    // Eliminar reseña
     async deleteResena(id) {
         const res = JSON.parse(localStorage.getItem('local_resenas') || '[]').filter(r => r.id !== id);
         localStorage.setItem('local_resenas', JSON.stringify(res));

@@ -12,7 +12,6 @@ body {
     padding-bottom: 40px;
 }
 
-/* Cabecera y logo */
 .header-bar {
     display: flex;
     justify-content: space-between;
@@ -57,7 +56,6 @@ body {
     gap: 8px;
 }
 
-/* Modales */
 .modal-auth-container {
     position: fixed;
     top: 0;
@@ -80,7 +78,6 @@ body {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
 }
 
-/* Contenedores y estructura */
 .contenedor-principal {
     max-width: 600px;
     margin: 30px auto;
@@ -125,7 +122,6 @@ select:focus, input:focus, textarea:focus {
     border-color: #fbbf24;
 }
 
-/* Formato para teléfono chileno */
 .input-tel-container {
     display: flex;
     align-items: center;
@@ -312,7 +308,6 @@ select:focus, input:focus, textarea:focus {
     font-weight: 800;
 }
 
-/* Indicador de día libre en el calendario */
 .cal-day.dia-libre {
     border: 1px solid #ef4444 !important;
     color: #fca5a5 !important;
@@ -341,6 +336,7 @@ select:focus, input:focus, textarea:focus {
     cursor: pointer;
     font-weight: 600;
     transition: all 0.2s;
+    font-size: 0.9rem;
 }
 
 .btn-hora:not(:disabled):hover, .btn-hora.active {
@@ -348,14 +344,15 @@ select:focus, input:focus, textarea:focus {
     background-color: #1a160d;
 }
 
-/* Horas ocupadas o bloqueadas para el cliente */
+/* Estado No Disponible del cliente: gris sin tachado */
 .btn-hora:disabled, .btn-hora.ocupado {
-    background-color: #111827 !important;
-    border-color: #1f2937 !important;
-    color: #6b7280 !important;
+    background-color: #0b111e !important;
+    border-color: #1a2536 !important;
+    color: #64748b !important;
     cursor: not-allowed !important;
-    opacity: 0.65;
-    text-decoration: line-through !important;
+    opacity: 0.75;
+    text-decoration: none !important;
+    font-size: 0.85rem;
 }
 
 /* Controles de disponibilidad del barbero */
@@ -407,12 +404,13 @@ select:focus, input:focus, textarea:focus {
     color: #ffffff;
 }
 
-/* Hora bloqueada por el barbero: roja y tachada */
+/* Estado bloqueado del barbero: rojo sin tachado */
 .btn-hora-barbero.bloqueada-barbero {
     border-color: #ef4444 !important;
-    color: #fca5a5 !important;
-    background-color: rgba(239, 68, 68, 0.2) !important;
-    text-decoration: line-through !important;
+    color: #ef4444 !important;
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    text-decoration: none !important;
+    font-size: 0.85rem;
 }
 
 /* Botones de acción */
