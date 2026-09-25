@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarEstrellas();
     comprobarAccesoBarbero();
 
-    // Sincronización en tiempo real
+    // Sincronizaciones activas de datos
     StorageManager.suscribirCitas((data) => {
         citas = data;
         actualizarPantalla();
@@ -32,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
         dibujarResenasBarbero();
     });
 
-    // Sincronización entre pestañas abiertas
     window.addEventListener('storage', (e) => {
         if (e.key === 'local_bloqueos') {
             bloqueos = JSON.parse(e.newValue || '{}');
@@ -128,7 +127,7 @@ function dibujarMes(gridId, titleId, labelId, inputId) {
     }
 }
 
-// Vista Cliente: Horas ocupadas o bloqueadas
+// Vista del cliente: sólo muestra (No Disponible) sin la hora tachada
 function dibujarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
     if (!contenedor) return;
@@ -145,7 +144,7 @@ function dibujarHorariosCliente() {
         if (bloqueadaPorBarbero || ocupadaPorCliente) {
             btn.disabled = true;
             btn.classList.add('ocupado');
-            btn.textContent = `${hora} (No Disponible)`;
+            btn.textContent = `(No Disponible)`;
         } else {
             btn.disabled = false;
             btn.classList.remove('ocupado');
@@ -154,7 +153,7 @@ function dibujarHorariosCliente() {
     });
 }
 
-// Vista Barbero: Alternar días u horas no disponibles
+// Vista del barbero: muestra (Día Tomado) sin número de hora cuando se bloquea
 function dibujarPanelDisponibilidad() {
     const checkDia = document.getElementById('check-bloquear-dia');
     const gridHoras = document.getElementById('grid-horas-barbero');
@@ -191,12 +190,11 @@ function dibujarPanelDisponibilidad() {
         const estaBloqueada = cfg.horasBloqueadas.includes(hora);
         if (estaBloqueada) {
             btn.classList.add('bloqueada-barbero');
-            btn.textContent = `${hora} (No Disponible)`;
+            btn.textContent = `(Día Tomado)`;
         } else {
             btn.textContent = `${hora} hrs`;
         }
 
-        // Clic directo en el botón
         btn.onclick = async (e) => {
             e.preventDefault();
             if (checkDia.checked) return;
@@ -371,8 +369,8 @@ function dibujarTablaReservas() {
             </td>
             <td>${c.fecha} - ${c.hora} hrs</td>
             <td>${escapar(c.servicio)}</td>
-            <td style="display: flex; gap: 6px;">
-                <button type="button" class="btn-eliminar" onclick="borrarCita('${c.id}')">🗑️</button>
+            <td>
+                <button type="button" class="btn-eliminar" onclick="borrarCita('${c.id}')" title="Eliminar Cita">🗑️</button>
             </td>
         </tr>
     `).join('');
@@ -448,6 +446,7 @@ function dibujarResenasCliente() {
     `).join('');
 }
 
+// Vista de reseñas con botón para eliminar en el panel de barbero
 function dibujarResenasBarbero() {
     const cont = document.getElementById('contenedor-gestion-resenas');
     if (!cont) return;
@@ -458,11 +457,16 @@ function dibujarResenasBarbero() {
     }
 
     cont.innerHTML = resenas.map(r => `
-        <div class="card-resena" style="margin-bottom: 12px;">
-            <strong>${escapar(r.nombre)} (${r.estrellas} ★)</strong>
-            <p style="font-size: 0.9rem; margin: 4px 0;">"${escapar(r.comentario)}"</p>
+        <div class="card-resena" style="margin-bottom: 12px; position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <strong>${escapar(r.nombre)} (${r.estrellas} ★)</strong>
+                    <p style="font-size: 0.9rem; margin: 4px 0;">"${escapar(r.comentario)}"</p>
+                </div>
+                <button type="button" class="btn-eliminar" onclick="borrarResena('${r.id}')" title="Eliminar reseña" style="padding: 4px 8px; font-size: 0.8rem;">🗑️</button>
+            </div>
             ${r.respuestaBarbero ? `
-                <p style="color: #10b981; font-size: 0.85rem;"><strong>Tu Respuesta:</strong> ${escapar(r.respuestaBarbero)}</p>
+                <p style="color: #10b981; font-size: 0.85rem; margin-top: 6px;"><strong>Tu Respuesta:</strong> ${escapar(r.respuestaBarbero)}</p>
             ` : `
                 <div style="display: flex; gap: 8px; margin-top: 8px;">
                     <input type="text" id="resp-${r.id}" placeholder="Escribe tu respuesta..." style="padding: 6px; font-size: 0.85rem;">
@@ -472,6 +476,12 @@ function dibujarResenasBarbero() {
         </div>
     `).join('');
 }
+
+window.borrarResena = async (id) => {
+    if (confirm('¿Seguro que deseas eliminar esta reseña?')) {
+        await StorageManager.deleteResena(id);
+    }
+};
 
 window.enviarRespuesta = async (id) => {
     const txt = document.getElementById(`resp-${id}`)?.value.trim();

@@ -60,51 +60,49 @@ export const StorageManager = {
     },
 
     async saveCita(cita) {
+        const citas = JSON.parse(localStorage.getItem('local_citas') || '[]');
+        const nueva = { id: 'cita_' + Date.now(), ...cita };
+        citas.push(nueva);
+        localStorage.setItem('local_citas', JSON.stringify(citas));
+
         try {
             await addDoc(collection(db, "citas"), cita);
-            return true;
-        } catch {
-            const citas = JSON.parse(localStorage.getItem('local_citas') || '[]');
-            citas.push({ id: 'loc_' + Date.now(), ...cita });
-            localStorage.setItem('local_citas', JSON.stringify(citas));
-            return true;
+        } catch (e) {
+            console.warn("Cita guardada en modo local.");
         }
+        return true;
     },
 
     async saveBloqueoFecha(fecha, config) {
-        // Guardado local instantáneo para máxima velocidad
         const local = JSON.parse(localStorage.getItem('local_bloqueos') || '{}');
         local[fecha] = config;
         localStorage.setItem('local_bloqueos', JSON.stringify(local));
 
         try {
             await setDoc(doc(db, "bloqueos", fecha), config);
-            return true;
-        } catch {
-            return false;
-        }
-    },
-
-    async deleteCita(id) {
-        try {
-            await deleteDoc(doc(db, "citas", id));
-        } catch {
-            const citas = JSON.parse(localStorage.getItem('local_citas') || '[]').filter(c => c.id !== id);
-            localStorage.setItem('local_citas', JSON.stringify(citas));
+        } catch (e) {
+            console.warn("Bloqueo guardado en modo local.");
         }
         return true;
     },
 
+    async deleteCita(id) {
+        const citas = JSON.parse(localStorage.getItem('local_citas') || '[]').filter(c => c.id !== id);
+        localStorage.setItem('local_citas', JSON.stringify(citas));
+        try {
+            await deleteDoc(doc(db, "citas", id));
+        } catch {}
+        return true;
+    },
+
     async saveResena(resena) {
+        const res = JSON.parse(localStorage.getItem('local_resenas') || '[]');
+        res.push({ id: 'res_' + Date.now(), ...resena });
+        localStorage.setItem('local_resenas', JSON.stringify(res));
         try {
             await addDoc(collection(db, "resenas"), resena);
-            return true;
-        } catch {
-            const res = JSON.parse(localStorage.getItem('local_resenas') || '[]');
-            res.push({ id: 'loc_' + Date.now(), ...resena });
-            localStorage.setItem('local_resenas', JSON.stringify(res));
-            return true;
-        }
+        } catch {}
+        return true;
     },
 
     async responderResena(id, respuesta) {
@@ -114,5 +112,15 @@ export const StorageManager = {
         } catch {
             return false;
         }
+    },
+
+    // Eliminar reseña
+    async deleteResena(id) {
+        const res = JSON.parse(localStorage.getItem('local_resenas') || '[]').filter(r => r.id !== id);
+        localStorage.setItem('local_resenas', JSON.stringify(res));
+        try {
+            await deleteDoc(doc(db, "resenas", id));
+        } catch {}
+        return true;
     }
 };
