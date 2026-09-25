@@ -9,48 +9,57 @@ import {
     updateDoc 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
+// Conexión a Firestore con respaldo local en localStorage
 export const StorageManager = {
+    // Lectura de citas en tiempo real
     suscribirCitas(callback) {
         try {
             return onSnapshot(collection(db, "citas"), (snapshot) => {
                 const citas = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                localStorage.setItem('local_citas', JSON.stringify(citas));
                 callback(citas);
-            }, (error) => {
-                console.warn("Error leyendo citas de Firebase, usando fallback local:", error);
-                callback([]);
+            }, () => {
+                const local = JSON.parse(localStorage.getItem('local_citas') || '[]');
+                callback(local);
             });
-        } catch (e) {
-            callback([]);
+        } catch {
+            const local = JSON.parse(localStorage.getItem('local_citas') || '[]');
+            callback(local);
         }
     },
 
+    // Lectura de horas y días bloqueados
     suscribirBloqueos(callback) {
         try {
             return onSnapshot(collection(db, "bloqueos"), (snapshot) => {
                 const bloqueos = {};
-                snapshot.docs.forEach(d => {
-                    bloqueos[d.id] = d.data();
-                });
+                snapshot.docs.forEach(d => { bloqueos[d.id] = d.data(); });
+                localStorage.setItem('local_bloqueos', JSON.stringify(bloqueos));
                 callback(bloqueos);
-            }, (error) => {
-                console.warn("Error leyendo bloqueos de Firebase:", error);
-                callback({});
+            }, () => {
+                const local = JSON.parse(localStorage.getItem('local_bloqueos') || '{}');
+                callback(local);
             });
-        } catch (e) {
-            callback({});
+        } catch {
+            const local = JSON.parse(localStorage.getItem('local_bloqueos') || '{}');
+            callback(local);
         }
     },
 
+    // Lectura de opiniones
     suscribirResenas(callback) {
         try {
             return onSnapshot(collection(db, "resenas"), (snapshot) => {
                 const resenas = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                localStorage.setItem('local_resenas', JSON.stringify(resenas));
                 callback(resenas);
-            }, (error) => {
-                callback([]);
+            }, () => {
+                const local = JSON.parse(localStorage.getItem('local_resenas') || '[]');
+                callback(local);
             });
-        } catch (e) {
-            callback([]);
+        } catch {
+            const local = JSON.parse(localStorage.getItem('local_resenas') || '[]');
+            callback(local);
         }
     },
 
@@ -58,18 +67,23 @@ export const StorageManager = {
         try {
             await addDoc(collection(db, "citas"), cita);
             return true;
-        } catch (e) {
-            console.error("Error guardando cita:", e);
-            return false;
+        } catch {
+            const citas = JSON.parse(localStorage.getItem('local_citas') || '[]');
+            citas.push({ id: 'loc_' + Date.now(), ...cita });
+            localStorage.setItem('local_citas', JSON.stringify(citas));
+            return true;
         }
     },
 
-    async saveBloqueoFecha(fechaFormatted, config) {
+    async saveBloqueoFecha(fecha, config) {
+        const local = JSON.parse(localStorage.getItem('local_bloqueos') || '{}');
+        local[fecha] = config;
+        localStorage.setItem('local_bloqueos', JSON.stringify(local));
+
         try {
-            await setDoc(doc(db, "bloqueos", fechaFormatted), config);
+            await setDoc(doc(db, "bloqueos", fecha), config);
             return true;
-        } catch (e) {
-            console.error("Error guardando bloqueo:", e);
+        } catch {
             return false;
         }
     },
@@ -77,27 +91,30 @@ export const StorageManager = {
     async deleteCita(id) {
         try {
             await deleteDoc(doc(db, "citas", id));
-            return true;
-        } catch (e) {
-            return false;
+        } catch {
+            const citas = JSON.parse(localStorage.getItem('local_citas') || '[]').filter(c => c.id !== id);
+            localStorage.setItem('local_citas', JSON.stringify(citas));
         }
+        return true;
     },
 
     async saveResena(resena) {
         try {
             await addDoc(collection(db, "resenas"), resena);
             return true;
-        } catch (e) {
-            return false;
+        } catch {
+            const res = JSON.parse(localStorage.getItem('local_resenas') || '[]');
+            res.push({ id: 'loc_' + Date.now(), ...resena });
+            localStorage.setItem('local_resenas', JSON.stringify(res));
+            return true;
         }
     },
 
     async responderResena(id, respuesta) {
         try {
-            const resenaRef = doc(db, "resenas", id);
-            await updateDoc(resenaRef, { respuestaBarbero: respuesta });
+            await updateDoc(doc(db, "resenas", id), { respuestaBarbero: respuesta });
             return true;
-        } catch (e) {
+        } catch {
             return false;
         }
     }

@@ -1,555 +1,492 @@
 import { StorageManager } from './storage.js';
 import { Validator } from './validator.js';
 
-let citasEfectivas = [];
-let bloqueosGlobales = {};
-let resenasEfectivas = [];
-let fechaSeleccionadaGlobal = new Date();
-let ratingValueGlobal = 5;
+let citas = [];
+let bloqueos = {};
+let resenas = [];
+let fechaSeleccionada = new Date();
+let ratingEstrellas = 5;
+
+const HORARIOS_DISPONIBLES = ["10:00", "11:00", "12:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
 
 document.addEventListener('DOMContentLoaded', () => {
-    inicializarCalendarios();
-    inicializarFormularios();
-    inicializarRatingStars();
-    verificarAutenticacionBarbero();
+    configurarCalendarios();
+    configurarFormularios();
+    configurarEstrellas();
+    comprobarAccesoBarbero();
 
-    // Suscripciones Firebase / Storage
-    StorageManager.suscribirCitas((citas) => {
-        citasEfectivas = citas;
-        renderizarVistaActual();
+    // Conexión de datos
+    StorageManager.suscribirCitas((data) => {
+        citas = data;
+        actualizarPantalla();
     });
 
-    StorageManager.suscribirBloqueos((bloqueos) => {
-        bloqueosGlobales = bloqueos;
-        renderizarVistaActual();
+    StorageManager.suscribirBloqueos((data) => {
+        bloqueos = data || {};
+        actualizarPantalla();
     });
 
-    StorageManager.suscribirResenas((resenas) => {
-        resenasEfectivas = resenas;
-        renderizarResenasCliente();
-        renderizarGestionResenasBarbero();
+    StorageManager.suscribirResenas((data) => {
+        resenas = data;
+        dibujarResenasCliente();
+        dibujarResenasBarbero();
     });
 });
 
-function renderizarVistaActual() {
-    renderizarHorariosCliente();
-    renderizarControlDisponibilidadBarbero();
-    renderizarTablaCitasBarbero();
+function actualizarPantalla() {
+    dibujarHorariosCliente();
+    dibujarPanelDisponibilidad();
+    dibujarTablaReservas();
 }
 
-// --- CALENDARIOS ---
-function inicializarCalendarios() {
-    renderizarCalendario('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
-    renderizarCalendario('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
+// Generación y navegación de días del calendario
+function configurarCalendarios() {
+    const render = () => {
+        dibujarMes('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
+        dibujarMes('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
+        actualizarPantalla();
+    };
 
-    setupNavCalendario('btn-prev-month', 'btn-next-month', 'cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
-    setupNavCalendario('barber-btn-prev-month', 'barber-btn-next-month', 'barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
+    render();
+
+    const vincularBotones = (prevId, nextId) => {
+        const btnPrev = document.getElementById(prevId);
+        const btnNext = document.getElementById(nextId);
+        if (btnPrev && btnNext) {
+            btnPrev.onclick = () => {
+                fechaSeleccionada.setMonth(fechaSeleccionada.getMonth() - 1);
+                render();
+            };
+            btnNext.onclick = () => {
+                fechaSeleccionada.setMonth(fechaSeleccionada.getMonth() + 1);
+                render();
+            };
+        }
+    };
+
+    vincularBotones('btn-prev-month', 'btn-next-month');
+    vincularBotones('barber-btn-prev-month', 'barber-btn-next-month');
 }
 
-function setupNavCalendario(btnPrevId, btnNextId, gridId, monthTitleId, selectedLabelId, hiddenInputId) {
-    const btnPrev = document.getElementById(btnPrevId);
-    const btnNext = document.getElementById(btnNextId);
-
-    if (btnPrev && btnNext) {
-        btnPrev.onclick = () => {
-            fechaSeleccionadaGlobal.setMonth(fechaSeleccionadaGlobal.getMonth() - 1);
-            renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInputId);
-            renderizarVistaActual();
-        };
-
-        btnNext.onclick = () => {
-            fechaSeleccionadaGlobal.setMonth(fechaSeleccionadaGlobal.getMonth() + 1);
-            renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInputId);
-            renderizarVistaActual();
-        };
-    }
-}
-
-function renderizarCalendario(gridId, monthTitleId, selectedLabelId, hiddenInputId) {
+function dibujarMes(gridId, titleId, labelId, inputId) {
     const grid = document.getElementById(gridId);
-    const monthTitle = document.getElementById(monthTitleId);
-    const selectedLabel = document.getElementById(selectedLabelId);
-    const hiddenInput = document.getElementById(hiddenInputId);
-
+    const title = document.getElementById(titleId);
+    const label = document.getElementById(labelId);
+    const input = document.getElementById(inputId);
     if (!grid) return;
 
     grid.innerHTML = '';
-    const year = fechaSeleccionadaGlobal.getFullYear();
-    const month = fechaSeleccionadaGlobal.getMonth();
+    const year = fechaSeleccionada.getFullYear();
+    const month = fechaSeleccionada.getMonth();
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-    const primerDiaMes = new Date(year, month, 1);
-    const ultimoDiaMes = new Date(year, month + 1, 0).getDate();
-    const nombreMesActual = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][month];
-    
-    if (monthTitle) monthTitle.textContent = `${nombreMesActual} De ${year}`;
+    if (title) title.textContent = `${meses[month]} De ${year}`;
 
-    let primerDiaSemanaIndex = primerDiaMes.getDay() - 1;
-    if (primerDiaSemanaIndex === -1) primerDiaSemanaIndex = 6;
+    const primerDiaIndex = (new Date(year, month, 1).getDay() + 6) % 7;
+    const totalDias = new Date(year, month + 1, 0).getDate();
+    const diasMesPasado = new Date(year, month, 0).getDate();
 
-    const ultimoDiaMesAnterior = new Date(year, month, 0).getDate();
-    for (let i = primerDiaSemanaIndex - 1; i >= 0; i--) {
-        const div = document.createElement('div');
-        div.className = 'cal-day other-month';
-        div.textContent = ultimoDiaMesAnterior - i;
-        grid.appendChild(div);
+    for (let i = primerDiaIndex - 1; i >= 0; i--) {
+        const celda = document.createElement('div');
+        celda.className = 'cal-day other-month';
+        celda.textContent = diasMesPasado - i;
+        grid.appendChild(celda);
     }
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
-    for (let dia = 1; dia <= ultimoDiaMes; dia++) {
-        const div = document.createElement('div');
-        div.className = 'cal-day';
-        div.textContent = dia;
+    for (let d = 1; d <= totalDias; d++) {
+        const celda = document.createElement('div');
+        celda.className = 'cal-day';
+        celda.textContent = d;
 
-        const fechaEvaluada = new Date(year, month, dia);
-        const fechaFormatted = formatDate(fechaEvaluada);
+        const fechaDia = new Date(year, month, d);
+        const fStr = formatearISO(fechaDia);
 
-        if (fechaEvaluada < hoy) {
-            div.classList.add('disabled');
+        if (fechaDia < hoy) {
+            celda.classList.add('disabled');
         } else {
-            if (fechaFormatted === formatDate(fechaSeleccionadaGlobal)) {
-                div.classList.add('selected');
-                if (hiddenInput) hiddenInput.value = fechaFormatted;
-                if (selectedLabel) selectedLabel.textContent = formatFechaLegible(fechaEvaluada);
+            if (fStr === formatearISO(fechaSeleccionada)) {
+                celda.classList.add('selected');
+                if (input) input.value = fStr;
+                if (label) label.textContent = formatearTextoFecha(fechaDia);
             }
 
-            div.onclick = () => {
-                fechaSeleccionadaGlobal = new Date(year, month, dia);
-                renderizarCalendario('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
-                renderizarCalendario('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
-                renderizarVistaActual();
+            celda.onclick = () => {
+                fechaSeleccionada = new Date(year, month, d);
+                dibujarMes('cal-days-grid', 'cal-month-title', 'cal-selected-label', 'fecha');
+                dibujarMes('barber-cal-days-grid', 'barber-cal-month-title', 'barber-cal-selected-label', 'barber-fecha-gestion');
+                actualizarPantalla();
             };
         }
-        grid.appendChild(div);
+        grid.appendChild(celda);
     }
 }
 
-// --- HORARIOS ---
-function renderizarHorariosCliente() {
+// Bloque de horas para el cliente
+function dibujarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
     if (!contenedor) return;
 
-    const fechaStr = formatDate(fechaSeleccionadaGlobal);
-    const configDia = bloqueosGlobales[fechaStr] || { bloqueadoCompleto: false, horasBloqueadas: [] };
-    const citasDelDia = citasEfectivas.filter(c => c.fecha === fechaStr);
+    const fechaHoy = formatearISO(fechaSeleccionada);
+    const cfg = bloqueos[fechaHoy] || { bloqueadoCompleto: false, horasBloqueadas: [] };
+    const ocupadas = citas.filter(c => c.fecha === fechaHoy).map(c => c.hora);
 
-    const botones = contenedor.querySelectorAll('.btn-hora');
-    botones.forEach(btn => {
-        const hora = btn.getAttribute('data-hora');
-        const estaOcupadaPorCita = citasDelDia.some(c => c.hora === hora);
-        const estaBloqueadaPorBarbero = configDia.bloqueadoCompleto || (configDia.horasBloqueadas && configDia.horasBloqueadas.includes(hora));
+    contenedor.querySelectorAll('.btn-hora').forEach(btn => {
+        const hora = btn.dataset.hora;
+        const noDisponible = cfg.bloqueadoCompleto || (cfg.horasBloqueadas && cfg.horasBloqueadas.includes(hora)) || ocupadas.includes(hora);
 
-        if (estaOcupadaPorCita || estaBloqueadaPorBarbero) {
-            btn.disabled = true;
-            btn.classList.add('ocupado');
-            btn.textContent = `${hora} (No Disp.)`;
-        } else {
-            btn.disabled = false;
-            btn.classList.remove('ocupado');
-            btn.textContent = `${hora} hrs`;
-        }
+        btn.disabled = noDisponible;
+        btn.classList.toggle('ocupado', noDisponible);
+        btn.textContent = noDisponible ? `${hora} (No Disp.)` : `${hora} hrs`;
     });
 }
 
-// --- FORMULARIOS ---
-function inicializarFormularios() {
-    const modalDatos = document.getElementById('modal-datos-cliente');
-    const formDatosFinales = document.getElementById('form-datos-finales');
+// Control del barbero: bloquear horas individuales o día entero
+function dibujarPanelDisponibilidad() {
+    const checkDia = document.getElementById('check-bloquear-dia');
+    const gridHoras = document.getElementById('grid-horas-barbero');
+    const cajaHoras = document.getElementById('contenedor-horas-barbero');
+    if (!checkDia || !gridHoras) return;
 
-    // Confirmación y guardado de cita final
-    if (formDatosFinales) {
-        formDatosFinales.onsubmit = async (e) => {
-            e.preventDefault();
+    const fechaHoy = formatearISO(fechaSeleccionada);
+    if (!bloqueos[fechaHoy]) {
+        bloqueos[fechaHoy] = { bloqueadoCompleto: false, horasBloqueadas: [] };
+    }
+    const cfg = bloqueos[fechaHoy];
 
-            const txtNombre = document.getElementById('cliente-nombre');
-            const txtTel = document.getElementById('cliente-telefono');
-            const txtCorreo = document.getElementById('cliente-correo');
-            const errNombre = document.getElementById('err-cliente-nombre');
-            const errTel = document.getElementById('err-cliente-telefono');
-            const errCorreo = document.getElementById('err-cliente-correo');
+    checkDia.checked = Boolean(cfg.bloqueadoCompleto);
 
-            if (errNombre) errNombre.textContent = '';
-            if (errTel) errTel.textContent = '';
-            if (errCorreo) errCorreo.textContent = '';
-
-            const nombre = Validator.trimInput(txtNombre ? txtNombre.value : '');
-            const telefonoRestante = Validator.trimInput(txtTel ? txtTel.value : '');
-            const correo = Validator.trimInput(txtCorreo ? txtCorreo.value : '');
-            const fecha = document.getElementById('fecha') && document.getElementById('fecha').value ? document.getElementById('fecha').value : formatDate(fechaSeleccionadaGlobal);
-            const hora = document.getElementById('hora') ? document.getElementById('hora').value : '';
-            const servicio = document.getElementById('servicio') ? document.getElementById('servicio').value : '';
-
-            let hasError = false;
-
-            if (!Validator.validateRequired(nombre)) {
-                if (errNombre) errNombre.textContent = 'Ingresa tu nombre completo.';
-                hasError = true;
-            }
-
-            if (!Validator.validarTelefonoChileRestante(telefonoRestante)) {
-                if (errTel) errTel.textContent = 'Debe contener exactamente 8 dígitos tras el +56 9.';
-                hasError = true;
-            }
-
-            if (!Validator.validarEmailSimple(correo)) {
-                if (errCorreo) errCorreo.textContent = 'Ingresa un correo válido con "@".';
-                hasError = true;
-            }
-
-            if (hasError) return;
-
-            const btnConfirmar = document.getElementById('btn-confirmar-cita');
-            if (btnConfirmar) {
-                btnConfirmar.disabled = true;
-                btnConfirmar.textContent = 'Agendando...';
-            }
-
-            const nuevaCita = {
-                nombre,
-                telefono: `+569${telefonoRestante}`,
-                correo,
-                fecha,
-                hora,
-                servicio,
-                fechaCreacion: new Date().toISOString()
-            };
-
-            const exito = await StorageManager.saveCita(nuevaCita);
-
-            if (btnConfirmar) {
-                btnConfirmar.disabled = false;
-                btnConfirmar.textContent = 'Confirmar y Agendar ✂️';
-            }
-
-            if (exito) {
-                alert(`¡Hora agendada con éxito para el ${fecha} a las ${hora} hrs!`);
-                formDatosFinales.reset();
-                if (modalDatos) modalDatos.style.display = 'none';
-                if (document.getElementById('hora')) document.getElementById('hora').value = '';
-                document.querySelectorAll('.btn-hora').forEach(b => b.classList.remove('active'));
-            } else {
-                alert("Error al agendar la hora. Intenta nuevamente.");
-            }
-        };
+    if (cajaHoras) {
+        cajaHoras.style.opacity = checkDia.checked ? '0.35' : '1';
+        cajaHoras.style.pointerEvents = checkDia.checked ? 'none' : 'auto';
     }
 
-    // Formulario Reseñas
-    const formResena = document.getElementById('form-resena');
-    if (formResena) {
-        formResena.onsubmit = async (e) => {
-            e.preventDefault();
-            const nombre = Validator.trimInput(document.getElementById('resena-nombre').value);
-            const comentario = Validator.trimInput(document.getElementById('resena-comentario').value);
-
-            if (!Validator.validateRequired(nombre) || !Validator.validateRequired(comentario)) {
-                alert("Por favor completa los campos de la reseña.");
-                return;
-            }
-
-            const nuevaResena = {
-                nombre,
-                estrellas: ratingValueGlobal,
-                comentario,
-                fecha: formatDate(new Date()),
-                respuestaBarbero: null
-            };
-
-            const exito = await StorageManager.saveResena(nuevaResena);
-            if (exito) {
-                alert("¡Opinión publicada!");
-                formResena.reset();
-            }
-        };
-    }
-
-    // Formulario Login Barbero
-    const formLogin = document.getElementById('form-login-barbero');
-    if (formLogin) {
-        const txtEmail = document.getElementById('login-email');
-        const txtPass = document.getElementById('pin-ingresado');
-        const errEmail = document.getElementById('err-login-email');
-        const errPass = document.getElementById('err-login-pass');
-        const alertBox = document.getElementById('login-alert');
-        const btnSubmit = document.getElementById('btn-login-submit');
-
-        formLogin.onsubmit = (e) => {
-            e.preventDefault();
-            if (errEmail) errEmail.textContent = '';
-            if (errPass) errPass.textContent = '';
-            if (alertBox) alertBox.className = 'alert d-none';
-
-            const email = Validator.trimInput(txtEmail ? txtEmail.value : '');
-            const pass = Validator.trimInput(txtPass ? txtPass.value : '');
-
-            let hasError = false;
-
-            if (!Validator.validateRequired(email)) {
-                if (errEmail) errEmail.textContent = 'El correo no puede estar en blanco.';
-                hasError = true;
-            } else if (!Validator.validarEmailSimple(email)) {
-                if (errEmail) errEmail.textContent = 'Debe incluir un "@" en el correo.';
-                hasError = true;
-            }
-
-            if (!Validator.validateRequired(pass)) {
-                if (errPass) errPass.textContent = 'La clave no puede estar en blanco.';
-                hasError = true;
-            } else if (!Validator.validarPasswordCorta(pass)) {
-                if (errPass) errPass.textContent = 'La contraseña debe tener de 4 a 5 caracteres.';
-                hasError = true;
-            }
-
-            if (hasError) return;
-
-            if (btnSubmit) {
-                btnSubmit.disabled = true;
-                btnSubmit.textContent = 'Verificando...';
-            }
-
-            setTimeout(() => {
-                if (alertBox) {
-                    alertBox.textContent = '¡Acceso concedido! Cargando panel...';
-                    alertBox.className = 'alert alert-success';
-                }
-
-                localStorage.setItem('barber_auth', 'true');
-                localStorage.setItem('barber_user', email);
-
-                setTimeout(() => {
-                    verificarAutenticacionBarbero();
-                    if (btnSubmit) {
-                        btnSubmit.disabled = false;
-                        btnSubmit.textContent = 'Ingresar al Panel 🚀';
-                    }
-                }, 800);
-            }, 400);
-        };
-    }
-
-    // Salir del Panel
-    const btnLogout = document.getElementById('btn-logout');
-    if (btnLogout) {
-        btnLogout.onclick = () => {
-            localStorage.removeItem('barber_auth');
-            localStorage.removeItem('barber_user');
-            verificarAutenticacionBarbero();
-        };
-    }
-}
-
-// --- PANEL BARBERO ---
-function renderizarControlDisponibilidadBarbero() {
-    const checkBloquearDia = document.getElementById('check-bloquear-dia');
-    const gridHorasBarbero = document.getElementById('grid-horas-barbero');
-    if (!checkBloquearDia || !gridHorasBarbero) return;
-
-    const fechaStr = formatDate(fechaSeleccionadaGlobal);
-    const configDia = bloqueosGlobales[fechaStr] || { bloqueadoCompleto: false, horasBloqueadas: [] };
-
-    checkBloquearDia.checked = configDia.bloqueadoCompleto;
-
-    checkBloquearDia.onchange = async () => {
-        configDia.bloqueadoCompleto = checkBloquearDia.checked;
-        await StorageManager.saveBloqueoFecha(fechaStr, configDia);
+    checkDia.onchange = async () => {
+        cfg.bloqueadoCompleto = checkDia.checked;
+        bloqueos[fechaHoy] = cfg;
+        dibujarPanelDisponibilidad();
+        dibujarHorariosCliente();
+        await StorageManager.saveBloqueoFecha(fechaHoy, cfg);
     };
 
-    const horasEstandar = ["10:00", "11:00", "12:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
-    gridHorasBarbero.innerHTML = '';
-
-    horasEstandar.forEach(hora => {
+    gridHoras.innerHTML = '';
+    HORARIOS_DISPONIBLES.forEach(hora => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn-hora-barbero';
-        
-        const estaBloqueada = configDia.horasBloqueadas && configDia.horasBloqueadas.includes(hora);
-        if (estaBloqueada) {
+
+        const bloqueada = Array.isArray(cfg.horasBloqueadas) && cfg.horasBloqueadas.includes(hora);
+        if (bloqueada) {
             btn.classList.add('bloqueada-barbero');
-            btn.textContent = `${hora} (Bloqueada)`;
+            btn.textContent = `${hora} (No Disp.)`;
         } else {
             btn.textContent = `${hora} hrs`;
         }
 
         btn.onclick = async () => {
-            if (!configDia.horasBloqueadas) configDia.horasBloqueadas = [];
-            if (estaBloqueada) {
-                configDia.horasBloqueadas = configDia.horasBloqueadas.filter(h => h !== hora);
+            if (!Array.isArray(cfg.horasBloqueadas)) cfg.horasBloqueadas = [];
+
+            if (cfg.horasBloqueadas.includes(hora)) {
+                cfg.horasBloqueadas = cfg.horasBloqueadas.filter(h => h !== hora);
             } else {
-                configDia.horasBloqueadas.push(hora);
+                cfg.horasBloqueadas.push(hora);
             }
-            await StorageManager.saveBloqueoFecha(fechaStr, configDia);
+
+            bloqueos[fechaHoy] = cfg;
+            dibujarPanelDisponibilidad();
+            dibujarHorariosCliente();
+            await StorageManager.saveBloqueoFecha(fechaHoy, cfg);
         };
 
-        gridHorasBarbero.appendChild(btn);
+        gridHoras.appendChild(btn);
     });
 }
 
-function renderizarTablaCitasBarbero() {
+// Formularios de reserva, reseñas y acceso barbero
+function configurarFormularios() {
+    // Enviar reserva
+    const fReserva = document.getElementById('form-datos-finales');
+    if (fReserva) {
+        fReserva.onsubmit = async (e) => {
+            e.preventDefault();
+            const nom = document.getElementById('cliente-nombre');
+            const tel = document.getElementById('cliente-telefono');
+            const cor = document.getElementById('cliente-correo');
+            const btn = document.getElementById('btn-confirmar-cita');
+
+            const valNom = Validator.limpiar(nom?.value);
+            const valTel = Validator.limpiar(tel?.value);
+            const valCor = Validator.limpiar(cor?.value);
+
+            let error = false;
+            document.getElementById('err-cliente-nombre').textContent = '';
+            document.getElementById('err-cliente-telefono').textContent = '';
+            document.getElementById('err-cliente-correo').textContent = '';
+
+            if (!Validator.requerido(valNom)) {
+                document.getElementById('err-cliente-nombre').textContent = 'Ingresa tu nombre completo.';
+                error = true;
+            }
+            if (!Validator.telefonoChile(valTel)) {
+                document.getElementById('err-cliente-telefono').textContent = 'Deben ser exactamente 8 números tras el +56 9.';
+                error = true;
+            }
+            if (!Validator.emailValido(valCor)) {
+                document.getElementById('err-cliente-correo').textContent = 'Ingresa un correo electrónico válido.';
+                error = true;
+            }
+
+            if (error) return;
+
+            btn.disabled = true;
+            btn.textContent = 'Agendando...';
+
+            const fecha = document.getElementById('fecha')?.value || formatearISO(fechaSeleccionada);
+            const hora = document.getElementById('hora')?.value || '';
+            const servicio = document.getElementById('servicio')?.value || '';
+
+            const ok = await StorageManager.saveCita({
+                nombre: valNom,
+                telefono: `+569${valTel}`,
+                correo: valCor,
+                fecha,
+                hora,
+                servicio,
+                fechaCreacion: new Date().toISOString()
+            });
+
+            btn.disabled = false;
+            btn.textContent = 'Confirmar y Agendar ✂️';
+
+            if (ok) {
+                alert(`¡Cita agendada para el ${fecha} a las ${hora} hrs!`);
+                fReserva.reset();
+                document.getElementById('modal-datos-cliente').style.display = 'none';
+                document.getElementById('hora').value = '';
+                document.querySelectorAll('.btn-hora').forEach(b => b.classList.remove('active'));
+            } else {
+                alert('No se pudo guardar la cita. Inténtalo de nuevo.');
+            }
+        };
+    }
+
+    // Publicar opinión
+    const fResena = document.getElementById('form-resena');
+    if (fResena) {
+        fResena.onsubmit = async (e) => {
+            e.preventDefault();
+            const nombre = Validator.limpiar(document.getElementById('resena-nombre')?.value);
+            const comentario = Validator.limpiar(document.getElementById('resena-comentario')?.value);
+
+            if (!Validator.requerido(nombre) || !Validator.requerido(comentario)) {
+                alert('Por favor completa tu nombre y comentario.');
+                return;
+            }
+
+            await StorageManager.saveResena({
+                nombre,
+                estrellas: ratingEstrellas,
+                comentario,
+                fecha: formatearISO(new Date()),
+                respuestaBarbero: null
+            });
+
+            alert('¡Gracias por tu opinión!');
+            fResena.reset();
+        };
+    }
+
+    // Login barbero
+    const fLogin = document.getElementById('form-login-barbero');
+    if (fLogin) {
+        fLogin.onsubmit = (e) => {
+            e.preventDefault();
+            const email = Validator.limpiar(document.getElementById('login-email')?.value);
+            const pass = Validator.limpiar(document.getElementById('pin-ingresado')?.value);
+            const btn = document.getElementById('btn-login-submit');
+
+            document.getElementById('err-login-email').textContent = '';
+            document.getElementById('err-login-pass').textContent = '';
+
+            let err = false;
+            if (!Validator.emailValido(email)) {
+                document.getElementById('err-login-email').textContent = 'Correo inválido.';
+                err = true;
+            }
+            if (!Validator.passwordCorta(pass)) {
+                document.getElementById('err-login-pass').textContent = 'La clave debe tener 4 o 5 caracteres.';
+                err = true;
+            }
+
+            if (err) return;
+
+            btn.disabled = true;
+            btn.textContent = 'Verificando...';
+
+            setTimeout(() => {
+                localStorage.setItem('barber_auth', 'true');
+                localStorage.setItem('barber_user', email);
+                comprobarAccesoBarbero();
+                btn.disabled = false;
+                btn.textContent = 'Ingresar al Panel 🚀';
+            }, 300);
+        };
+    }
+
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+        btnLogout.onclick = () => {
+            localStorage.removeItem('barber_auth');
+            localStorage.removeItem('barber_user');
+            comprobarAccesoBarbero();
+        };
+    }
+}
+
+// Citas en panel administrativo
+function dibujarTablaReservas() {
     const contenedor = document.getElementById('contenedor-citas');
     if (!contenedor) return;
 
-    if (citasEfectivas.length === 0) {
+    if (citas.length === 0) {
         contenedor.innerHTML = '<p style="color: #9ca3af;">No hay citas agendadas por el momento.</p>';
         return;
     }
 
-    let html = `
+    let filas = citas.map(c => `
+        <tr>
+            <td>
+                <strong>${escapar(c.nombre)}</strong><br>
+                <small style="color: #9ca3af;">📞 ${escapar(c.telefono || '-')}</small><br>
+                <small style="color: #9ca3af;">✉️ ${escapar(c.correo || '-')}</small>
+            </td>
+            <td>${c.fecha} - ${c.hora} hrs</td>
+            <td>${escapar(c.servicio)}</td>
+            <td style="display: flex; gap: 6px;">
+                <button type="button" class="btn-eliminar" onclick="borrarCita('${c.id}')">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+
+    contenedor.innerHTML = `
         <table class="tabla-gestion">
             <thead>
                 <tr>
-                    <th>Cliente / Contacto</th>
+                    <th>Cliente</th>
                     <th>Fecha / Hora</th>
                     <th>Servicio</th>
-                    <th>Acciones</th>
+                    <th>Acción</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody>${filas}</tbody>
+        </table>
     `;
-
-    citasEfectivas.forEach(c => {
-        const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=Corte+${encodeURIComponent(c.nombre)}&dates=${c.fecha.replace(/-/g, '')}T${c.hora.replace(':', '')}00Z/${c.fecha.replace(/-/g, '')}T${c.hora.replace(':', '')}00Z&details=${encodeURIComponent('Tel: ' + (c.telefono || '') + ' - ' + c.servicio)}`;
-
-        html += `
-            <tr>
-                <td>
-                    <strong>${escapeHTML(c.nombre)}</strong><br>
-                    <small style="color: #9ca3af;">📞 ${escapeHTML(c.telefono || 'Sin teléfono')}</small><br>
-                    <small style="color: #9ca3af;">✉️ ${escapeHTML(c.correo || 'Sin correo')}</small>
-                </td>
-                <td>${c.fecha} - ${c.hora} hrs</td>
-                <td>${escapeHTML(c.servicio)}</td>
-                <td style="display: flex; gap: 6px;">
-                    <a href="${googleCalUrl}" target="_blank" class="btn-sync-cal">📆 Google</a>
-                    <button type="button" class="btn-eliminar" onclick="eliminarCitaBarbero('${c.id}')">🗑️</button>
-                </td>
-            </tr>
-        `;
-    });
-
-    html += '</tbody></table>';
-    contenedor.innerHTML = html;
 }
 
-window.eliminarCitaBarbero = async (id) => {
-    if (confirm("¿Estás seguro de cancelar esta cita?")) {
+window.borrarCita = async (id) => {
+    if (confirm('¿Deseas cancelar esta cita?')) {
         await StorageManager.deleteCita(id);
     }
 };
 
-function verificarAutenticacionBarbero() {
+function comprobarAccesoBarbero() {
     const modal = document.getElementById('modal-auth');
-    const contenido = document.getElementById('contenido-barbero');
-    if (!modal || !contenido) return;
+    const panel = document.getElementById('contenido-barbero');
+    if (!modal || !panel) return;
 
-    if (localStorage.getItem('barber_auth') === 'true') {
-        modal.style.display = 'none';
-        contenido.style.display = 'block';
-    } else {
-        modal.style.display = 'flex';
-        contenido.style.display = 'none';
-    }
+    const auth = localStorage.getItem('barber_auth') === 'true';
+    modal.style.display = auth ? 'none' : 'flex';
+    panel.style.display = auth ? 'block' : 'none';
 }
 
-// --- RESEÑAS & ESTRELLAS ---
-function inicializarRatingStars() {
-    const starsContainer = document.getElementById('rating-stars');
-    if (!starsContainer) return;
+function configurarEstrellas() {
+    const caja = document.getElementById('rating-stars');
+    if (!caja) return;
 
-    const stars = starsContainer.querySelectorAll('.star');
-    stars.forEach(s => {
-        s.onclick = () => {
-            ratingValueGlobal = parseInt(s.getAttribute('data-value'));
-            stars.forEach((st, idx) => {
-                if (idx < ratingValueGlobal) st.classList.add('active');
-                else st.classList.remove('active');
+    caja.querySelectorAll('.star').forEach(star => {
+        star.onclick = () => {
+            ratingEstrellas = parseInt(star.dataset.value);
+            caja.querySelectorAll('.star').forEach((s, i) => {
+                s.classList.toggle('active', i < ratingEstrellas);
             });
         };
     });
 }
 
-function renderizarResenasCliente() {
-    const contenedor = document.getElementById('lista-resenas');
-    if (!contenedor) return;
+function dibujarResenasCliente() {
+    const cont = document.getElementById('lista-resenas');
+    if (!cont) return;
 
-    if (resenasEfectivas.length === 0) {
-        contenedor.innerHTML = '<p style="color: #9ca3af; font-size: 0.85rem;">Sé el primero en dejar una opinión.</p>';
+    if (resenas.length === 0) {
+        cont.innerHTML = '<p style="color: #9ca3af; font-size: 0.85rem;">Aún no hay opiniones publicadas.</p>';
         return;
     }
 
-    let html = '';
-    resenasEfectivas.forEach(r => {
-        const estrellas = '★'.repeat(r.estrellas) + '☆'.repeat(5 - r.estrellas);
-        html += `
-            <div class="card-resena">
-                <div class="resena-header">
-                    <strong>${escapeHTML(r.nombre)}</strong>
-                    <span class="estrellas-render">${estrellas}</span>
+    cont.innerHTML = resenas.map(r => `
+        <div class="card-resena">
+            <div class="resena-header">
+                <strong>${escapar(r.nombre)}</strong>
+                <span class="estrellas-render">${'★'.repeat(r.estrellas) + '☆'.repeat(5 - r.estrellas)}</span>
+            </div>
+            <p style="margin-top: 6px; font-size: 0.9rem;">${escapar(r.comentario)}</p>
+            ${r.respuestaBarbero ? `
+                <div class="respuesta-barbero-box">
+                    <strong style="color: #fbbf24; font-size: 0.8rem;">Respuesta del Barbero:</strong>
+                    <p style="font-size: 0.85rem; margin-top: 2px;">${escapar(r.respuestaBarbero)}</p>
                 </div>
-                <p style="margin-top: 6px; font-size: 0.9rem;">${escapeHTML(r.comentario)}</p>
-                ${r.respuestaBarbero ? `
-                    <div class="respuesta-barbero-box">
-                        <strong style="color: #fbbf24; font-size: 0.8rem;">Respuesta del Barbero:</strong>
-                        <p style="font-size: 0.85rem; margin-top: 2px;">${escapeHTML(r.respuestaBarbero)}</p>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    });
-    contenedor.innerHTML = html;
+            ` : ''}
+        </div>
+    `).join('');
 }
 
-function renderizarGestionResenasBarbero() {
-    const contenedor = document.getElementById('contenedor-gestion-resenas');
-    if (!contenedor) return;
+function dibujarResenasBarbero() {
+    const cont = document.getElementById('contenedor-gestion-resenas');
+    if (!cont) return;
 
-    if (resenasEfectivas.length === 0) {
-        contenedor.innerHTML = '<p style="color: #9ca3af;">No hay reseñas publicadas aún.</p>';
+    if (resenas.length === 0) {
+        cont.innerHTML = '<p style="color: #9ca3af;">No hay opiniones registradas.</p>';
         return;
     }
 
-    let html = '';
-    resenasEfectivas.forEach(r => {
-        html += `
-            <div class="card-resena" style="margin-bottom: 12px;">
-                <strong>${escapeHTML(r.nombre)} (${r.estrellas} ★)</strong>
-                <p style="font-size: 0.9rem; margin: 4px 0;">"${escapeHTML(r.comentario)}"</p>
-                ${r.respuestaBarbero ? `
-                    <p style="color: #10b981; font-size: 0.85rem;"><strong>Tu Respuesta:</strong> ${escapeHTML(r.respuestaBarbero)}</p>
-                ` : `
-                    <div style="display: flex; gap: 8px; margin-top: 8px;">
-                        <input type="text" id="resp-input-${r.id}" placeholder="Escribe tu respuesta..." style="padding: 6px; font-size: 0.85rem;">
-                        <button type="button" class="btn-publicar" style="width: auto; padding: 6px 12px;" onclick="enviarRespuestaBarbero('${r.id}')">Responder</button>
-                    </div>
-                `}
-            </div>
-        `;
-    });
-    contenedor.innerHTML = html;
+    cont.innerHTML = resenas.map(r => `
+        <div class="card-resena" style="margin-bottom: 12px;">
+            <strong>${escapar(r.nombre)} (${r.estrellas} ★)</strong>
+            <p style="font-size: 0.9rem; margin: 4px 0;">"${escapar(r.comentario)}"</p>
+            ${r.respuestaBarbero ? `
+                <p style="color: #10b981; font-size: 0.85rem;"><strong>Tu Respuesta:</strong> ${escapar(r.respuestaBarbero)}</p>
+            ` : `
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <input type="text" id="resp-${r.id}" placeholder="Escribe tu respuesta..." style="padding: 6px; font-size: 0.85rem;">
+                    <button type="button" class="btn-publicar" style="width: auto; padding: 6px 12px;" onclick="enviarRespuesta('${r.id}')">Responder</button>
+                </div>
+            `}
+        </div>
+    `).join('');
 }
 
-window.enviarRespuestaBarbero = async (id) => {
-    const input = document.getElementById(`resp-input-${id}`);
-    if (!input || !input.value.trim()) return;
-    await StorageManager.responderResena(id, input.value.trim());
+window.enviarRespuesta = async (id) => {
+    const txt = document.getElementById(`resp-${id}`)?.value.trim();
+    if (!txt) return;
+    await StorageManager.responderResena(id, txt);
 };
 
-// --- UTILS ---
-function formatDate(d) {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+// Formato de fechas y seguridad
+function formatearISO(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dia = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dia}`;
 }
 
-function formatFechaLegible(d) {
+function formatearTextoFecha(d) {
     const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     return `${dias[d.getDay()]}, ${d.getDate()} De ${meses[d.getMonth()]}`;
 }
 
-function escapeHTML(str) {
+function escapar(str) {
     if (!str) return '';
-    return str.replace(/[&<>'"]/g, 
-        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
-    );
+    return String(str).replace(/[&<>'"]/g, t => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[t] || t));
 }

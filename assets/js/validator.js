@@ -1,89 +1,34 @@
-/**
- * Módulo de Validación de Datos y Reglas de Negocio - Yunghbarber
- */
-
+// Validaciones para formularios y negocio
 export const Validator = {
-    /**
-     * Limpia y remueve espacios al inicio y al final
-     */
-    trimInput(str) {
+    // Quita espacios en blanco alrededor
+    limpiar(str) {
         return typeof str === 'string' ? str.trim() : '';
     },
 
-    /**
-     * Valida que un campo no esté vacío ni contenga solo espacios
-     */
-    validateRequired(str) {
-        if (!str) return false;
-        return this.trimInput(str).length > 0;
+    // Comprueba que no esté vacío
+    requerido(str) {
+        return this.limpiar(str).length > 0;
     },
 
-    /**
-     * Validación de correo: debe contener '@' y al menos 3 caracteres
-     */
-    validarEmailSimple(email) {
+    // Correo estándar con arroba
+    emailValido(email) {
         if (!email) return false;
-        const clean = this.trimInput(email);
-        return clean.includes('@') && clean.length >= 3;
+        const texto = this.limpiar(email);
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(texto) || (texto.includes('@') && texto.length >= 5);
     },
 
-    /**
-     * Valida que la contraseña tenga entre 4 y 5 caracteres
-     */
-    validarPasswordCorta(pass) {
-        if (!pass) return false;
-        const clean = this.trimInput(pass);
-        return clean.length >= 4 && clean.length <= 5;
+    // Password barbero entre 4 y 5 caracteres
+    passwordCorta(pass) {
+        const texto = this.limpiar(pass);
+        return texto.length >= 4 && texto.length <= 5;
     },
 
-    /**
-     * Valida los 8 dígitos restantes del número chileno (después del +56 9)
-     */
-    validarTelefonoChileRestante(tel) {
-        if (!tel) return false;
-        const clean = this.trimInput(tel);
-        return /^\d{8}$/.test(clean);
-    },
-
-    /**
-     * Valida formato de correo estándar
-     */
-    validarEmail(email) {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(String(email).toLowerCase());
-    },
-
-    /**
-     * Valida que una fecha y hora no sean pasadas
-     */
-    validarFechaHoraFutura(fechaStr, horaStr) {
-        if (!fechaStr || !horaStr) {
-            return { isValid: false, message: 'Debe seleccionar una fecha y hora válidas.' };
-        }
-        const fechaCita = new Date(`${fechaStr}T${horaStr}`);
-        const ahora = new Date();
-        if (isNaN(fechaCita.getTime())) {
-            return { isValid: false, message: 'El formato de fecha u hora es inválido.' };
-        }
-        if (fechaCita < ahora) {
-            return { isValid: false, message: 'No puedes agendar una cita en una fecha u hora pasada.' };
-        }
-        return { isValid: true, message: '' };
-    },
-
-    /**
-     * Verifica colisiones de horario
-     */
-    existeConflictoHorario(barbero, fecha, hora, citasExistentes) {
-        return citasExistentes.some(cita => {
-            if (cita.estado === 'Cancelada') return false;
-            const mismoBarbero = barbero ? cita.barbero === barbero : true;
-            return mismoBarbero && cita.fecha === fecha && cita.hora === hora;
-        });
+    // Teléfono chileno: 8 dígitos exactos tras el +56 9
+    telefonoChile(tel) {
+        return /^\d{8}$/.test(this.limpiar(tel));
     }
 };
 
-// Exportación global para pruebas unitarias en consola F12
 if (typeof window !== 'undefined') {
     window.Validator = Validator;
 }
