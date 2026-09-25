@@ -8,39 +8,26 @@
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <!-- Modal de Autenticación / Login de Barbero -->
+    <!-- Modal de autenticación del barbero -->
     <div id="modal-auth" class="modal-auth-container">
         <div class="card-box card-auth">
             <h2>🔒 Acceso Restringido</h2>
-            <p style="color: #9ca3af; font-size: 0.9rem; margin-top: 6px;">Ingresa tus credenciales para acceder al panel:</p>
+            <p style="color: #9ca3af; font-size: 0.9rem; margin-top: 6px;">Ingresa tus credenciales de barbero:</p>
             
             <form id="form-login-barbero" style="margin-top: 15px;" novalidate>
                 <div class="campo">
                     <label for="login-email" style="text-align: left;">Correo electrónico:</label>
-                    <input 
-                        type="text" 
-                        id="login-email" 
-                        placeholder="barbero@yungh.cl" 
-                        autocomplete="off"
-                        required
-                    >
+                    <input type="text" id="login-email" placeholder="barbero@yungh.cl" autocomplete="off" required>
                     <small id="err-login-email" class="error-msg"></small>
                 </div>
 
                 <div class="campo">
                     <label for="pin-ingresado" style="text-align: left;">Contraseña (4 a 5 caracteres):</label>
-                    <input 
-                        type="password" 
-                        id="pin-ingresado" 
-                        placeholder="••••" 
-                        maxlength="5" 
-                        required
-                    >
+                    <input type="password" id="pin-ingresado" placeholder="••••" maxlength="5" required>
                     <small id="err-login-pass" class="error-msg"></small>
                 </div>
 
                 <div id="login-alert" class="alert d-none"></div>
-
                 <button type="submit" id="btn-login-submit" class="btn-confirmar">Ingresar al Panel 🚀</button>
             </form>
             
@@ -50,7 +37,7 @@
         </div>
     </div>
 
-    <!-- Contenido del Panel (Oculto hasta autenticarse) -->
+    <!-- Panel de gestión privado -->
     <div id="contenido-barbero" style="display: none;">
         <header class="header-bar header-barbero">
             <div class="logo">
@@ -58,13 +45,13 @@
                 <p>Panel Administrativo</p>
             </div>
             <div class="header-acciones">
-                <button type="button" id="btn-logout" class="btn-eliminar btn-salir-barber">🔒 Salir</button>
-                <a href="index.html" class="btn-panel btn-volver-app">Volver a la App 🏠</a>
+                <button type="button" id="btn-logout" class="btn-eliminar">🔒 Salir</button>
+                <a href="index.html" class="btn-panel">Volver a la App 🏠</a>
             </div>
         </header>
 
         <main class="contenedor-principal">
-            <!-- Control de Disponibilidad / Horarios del Barbero -->
+            <!-- Gestión de Horarios y Días Libres -->
             <section class="card-box">
                 <h2>📅 Gestión de Horarios y Días Libres</h2>
                 <p class="subtitulo-seccion" style="color: #9ca3af; margin-bottom: 12px;">Configura tus días de estudio o descanso</p>
@@ -72,12 +59,10 @@
                 <div class="campo">
                     <label>Seleccionar Fecha a Configurar:</label>
                     <div class="calendar-widget" id="barber-calendar-widget">
-                        <div class="cal-header-selected" id="barber-cal-selected-label">
-                            Martes, 18 De Agosto
-                        </div>
+                        <div class="cal-header-selected" id="barber-cal-selected-label">Cargando fecha...</div>
                         
                         <div class="cal-nav-bar">
-                            <span class="cal-month-title" id="barber-cal-month-title">Agosto De 2026</span>
+                            <span class="cal-month-title" id="barber-cal-month-title"></span>
                             <div class="cal-nav-btns">
                                 <button type="button" class="btn-cal-nav" id="barber-btn-prev-month">▲</button>
                                 <button type="button" class="btn-cal-nav" id="barber-btn-next-month">▼</button>
@@ -90,31 +75,29 @@
 
                         <div class="cal-days-grid" id="barber-cal-days-grid"></div>
                     </div>
-
-                    <input type="hidden" id="barber-fecha-gestion" required>
+                    <input type="hidden" id="barber-fecha-gestion">
                 </div>
 
-                <div class="box-bloqueo-dia" style="margin-top: 15px;">
+                <div class="box-bloqueo-dia">
                     <label class="switch-container">
                         <input type="checkbox" id="check-bloquear-dia">
-                        <span class="slider"></span>
                         <strong>Tomarme el día completo (No disponible)</strong>
                     </label>
                 </div>
 
                 <div class="contenedor-horas-barbero" id="contenedor-horas-barbero">
-                    <p class="titulo-deja-resena" style="margin-top: 15px;">Selecciona las horas que NO trabajarás este día:</p>
+                    <p style="margin-top: 15px; font-size: 0.9rem; color: #9ca3af;">Selecciona las horas que NO trabajarás este día:</p>
                     <div class="grid-horarios-barbero" id="grid-horas-barbero"></div>
                 </div>
             </section>
 
-            <!-- Control de Citas Agendadas y Sincronización -->
+            <!-- Citas agendadas por clientes -->
             <section class="card-box" style="margin-top: 2rem;">
                 <h2>Horas Agendadas por Clientes</h2>
                 <div id="contenedor-citas"></div>
             </section>
 
-            <!-- Control y Respuesta de Reseñas -->
+            <!-- Gestión y respuesta de opiniones -->
             <section class="card-box" style="margin-top: 2rem;">
                 <h2>💬 Gestión y Respuesta de Reseñas</h2>
                 <div id="contenedor-gestion-resenas"></div>

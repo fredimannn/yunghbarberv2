@@ -9,9 +9,7 @@ import {
     updateDoc 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// Conexión a Firestore con respaldo local en localStorage
 export const StorageManager = {
-    // Lectura de citas en tiempo real
     suscribirCitas(callback) {
         try {
             return onSnapshot(collection(db, "citas"), (snapshot) => {
@@ -28,7 +26,6 @@ export const StorageManager = {
         }
     },
 
-    // Lectura de horas y días bloqueados
     suscribirBloqueos(callback) {
         try {
             return onSnapshot(collection(db, "bloqueos"), (snapshot) => {
@@ -46,7 +43,6 @@ export const StorageManager = {
         }
     },
 
-    // Lectura de opiniones
     suscribirResenas(callback) {
         try {
             return onSnapshot(collection(db, "resenas"), (snapshot) => {
@@ -76,6 +72,7 @@ export const StorageManager = {
     },
 
     async saveBloqueoFecha(fecha, config) {
+        // Guardado local instantáneo para máxima velocidad
         const local = JSON.parse(localStorage.getItem('local_bloqueos') || '{}');
         local[fecha] = config;
         localStorage.setItem('local_bloqueos', JSON.stringify(local));

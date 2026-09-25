@@ -14,8 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarFormularios();
     configurarEstrellas();
     comprobarAccesoBarbero();
+    configurarEventosHorasBarbero();
 
-    // Sincronización en tiempo real
+    // Sincronizaciones activas
     StorageManager.suscribirCitas((data) => {
         citas = data;
         actualizarPantalla();
@@ -32,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dibujarResenasBarbero();
     });
 
-    // Detecta cambios si el barbero bloquea horas en otra pestaña
+    // Detectar cambios entre pestañas abiertas
     window.addEventListener('storage', (e) => {
         if (e.key === 'local_bloqueos') {
             bloqueos = JSON.parse(e.newValue || '{}');
@@ -49,7 +50,7 @@ function actualizarPantalla() {
     dibujarTablaReservas();
 }
 
-// Calendario interactivo
+// Navegación del calendario
 function configurarCalendarios() {
     actualizarPantalla();
 
@@ -112,9 +113,7 @@ function dibujarMes(gridId, titleId, labelId, inputId) {
         if (fechaDia < hoy) {
             celda.classList.add('disabled');
         } else {
-            if (estaBloqueadoDia) {
-                celda.classList.add('dia-libre');
-            }
+            if (estaBloqueadoDia) celda.classList.add('dia-libre');
 
             if (fStr === formatearISO(fechaSeleccionada)) {
                 celda.classList.add('selected');
@@ -131,7 +130,7 @@ function dibujarMes(gridId, titleId, labelId, inputId) {
     }
 }
 
-// Vista de cliente: pone en gris las horas tomadas o bloqueadas
+// Vista de cliente (Horarios tomados o bloqueados en gris)
 function dibujarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
     if (!contenedor) return;
@@ -157,7 +156,7 @@ function dibujarHorariosCliente() {
     });
 }
 
-// Vista del barbero: marca las horas que NO trabaja en rojo tachado
+// Panel del Barbero (Renderizado reactivo de horas y switch de día)
 function dibujarPanelDisponibilidad() {
     const checkDia = document.getElementById('check-bloquear-dia');
     const gridHoras = document.getElementById('grid-horas-barbero');
@@ -169,12 +168,13 @@ function dibujarPanelDisponibilidad() {
         bloqueos[fechaHoy] = { bloqueadoCompleto: false, horasBloqueadas: [] };
     }
     const cfg = bloqueos[fechaHoy];
+    if (!Array.isArray(cfg.horasBloqueadas)) cfg.horasBloqueadas = [];
 
     checkDia.checked = Boolean(cfg.bloqueadoCompleto);
 
     if (cajaHoras) {
         cajaHoras.style.opacity = checkDia.checked ? '0.35' : '1';
-        cajaHoras.style.pointerEvents = checkDia.checked ? 'none' : 'auto';
+        cajaHoras.style.pointerEvents = 'auto'; // Permitir clics siempre
     }
 
     checkDia.onchange = async () => {
@@ -189,35 +189,53 @@ function dibujarPanelDisponibilidad() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn-hora-barbero';
+        btn.setAttribute('data-hora', hora);
 
-        const bloqueada = Array.isArray(cfg.horasBloqueadas) && cfg.horasBloqueadas.includes(hora);
+        const bloqueada = cfg.horasBloqueadas.includes(hora);
         if (bloqueada) {
             btn.classList.add('bloqueada-barbero');
-            btn.textContent = `${hora} (Tomado / No laborable)`;
+            btn.textContent = `${hora} (No Disp.)`;
         } else {
             btn.textContent = `${hora} hrs`;
         }
-
-        // Click instantáneo para bloquear o desbloquear
-        btn.onclick = async () => {
-            if (!Array.isArray(cfg.horasBloqueadas)) cfg.horasBloqueadas = [];
-
-            if (cfg.horasBloqueadas.includes(hora)) {
-                cfg.horasBloqueadas = cfg.horasBloqueadas.filter(h => h !== hora);
-            } else {
-                cfg.horasBloqueadas.push(hora);
-            }
-
-            bloqueos[fechaHoy] = cfg;
-            actualizarPantalla();
-            await StorageManager.saveBloqueoFecha(fechaHoy, cfg);
-        };
 
         gridHoras.appendChild(btn);
     });
 }
 
+// Escucha por delegación de eventos en las horas del barbero
+function configurarEventosHorasBarbero() {
+    const gridHoras = document.getElementById('grid-horas-barbero');
+    const checkDia = document.getElementById('check-bloquear-dia');
+    if (!gridHoras) return;
+
+    gridHoras.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button');
+        if (!btn || (checkDia && checkDia.checked)) return;
+
+        const hora = btn.getAttribute('data-hora') || btn.textContent.split(' ')[0].trim();
+        const fechaHoy = formatearISO(fechaSeleccionada);
+
+        if (!bloqueos[fechaHoy]) {
+            bloqueos[fechaHoy] = { bloqueadoCompleto: false, horasBloqueadas: [] };
+        }
+        const cfg = bloqueos[fechaHoy];
+        if (!Array.isArray(cfg.horasBloqueadas)) cfg.horasBloqueadas = [];
+
+        if (cfg.horasBloqueadas.includes(hora)) {
+            cfg.horasBloqueadas = cfg.horasBloqueadas.filter(h => h !== hora);
+        } else {
+            cfg.horasBloqueadas.push(hora);
+        }
+
+        bloqueos[fechaHoy] = cfg;
+        actualizarPantalla();
+        await StorageManager.saveBloqueoFecha(fechaHoy, cfg);
+    });
+}
+
 function configurarFormularios() {
+    // Formulario de confirmación y agendamiento
     const fReserva = document.getElementById('form-datos-finales');
     if (fReserva) {
         fReserva.onsubmit = async (e) => {
@@ -283,6 +301,7 @@ function configurarFormularios() {
         };
     }
 
+    // Formulario de reseñas
     const fResena = document.getElementById('form-resena');
     if (fResena) {
         fResena.onsubmit = async (e) => {
@@ -308,6 +327,7 @@ function configurarFormularios() {
         };
     }
 
+    // Login barbero
     const fLogin = document.getElementById('form-login-barbero');
     if (fLogin) {
         fLogin.onsubmit = (e) => {

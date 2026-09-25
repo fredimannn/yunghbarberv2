@@ -17,7 +17,7 @@
     </header>
 
     <main class="contenedor-principal">
-        <!-- Reserva: Fecha, hora y servicio -->
+        <!-- Paso 1: Selección de Fecha, Horario y Servicio -->
         <section class="card-box">
             <form id="form-agenda" novalidate onsubmit="return false;">
                 <div class="campo">
@@ -146,7 +146,7 @@
         </div>
     </div>
 
-    <!-- Acciones directas de la interfaz cliente -->
+    <!-- Script de eventos para inputs y modal del cliente -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const btnsHora = document.querySelectorAll('.btn-hora');
@@ -158,7 +158,6 @@
             const txtResumen = document.getElementById('resumen-reserva-txt');
             const txtTel = document.getElementById('cliente-telefono');
 
-            // Marcar hora seleccionada
             btnsHora.forEach(btn => {
                 btn.addEventListener('click', () => {
                     if (btn.disabled) return;
@@ -169,7 +168,6 @@
                 });
             });
 
-            // Abrir y cerrar modal
             if (btnAbrir) {
                 btnAbrir.addEventListener('click', () => {
                     if (!inputHora || !inputHora.value) {
@@ -187,7 +185,6 @@
                 btnCerrar.addEventListener('click', () => modal.style.display = 'none');
             }
 
-            // Filtrar solo 8 números para teléfono chileno tras el +56 9
             if (txtTel) {
                 txtTel.addEventListener('input', (e) => {
                     e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
