@@ -14,9 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarFormularios();
     configurarEstrellas();
     comprobarAccesoBarbero();
-    configurarClicksHorasBarbero();
 
-    // Sincronizaciones activas de datos
+    // Sincronización en tiempo real
     StorageManager.suscribirCitas((data) => {
         citas = data;
         actualizarPantalla();
@@ -33,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dibujarResenasBarbero();
     });
 
-    // Sincronización instantánea entre pestañas abiertas
+    // Sincronización entre pestañas abiertas
     window.addEventListener('storage', (e) => {
         if (e.key === 'local_bloqueos') {
             bloqueos = JSON.parse(e.newValue || '{}');
@@ -50,7 +49,6 @@ function actualizarPantalla() {
     dibujarTablaReservas();
 }
 
-// Configuración y eventos de navegación del calendario
 function configurarCalendarios() {
     actualizarPantalla();
 
@@ -130,7 +128,7 @@ function dibujarMes(gridId, titleId, labelId, inputId) {
     }
 }
 
-// Vista del cliente: horas ocupadas o bloqueadas en gris
+// Vista Cliente: Horas ocupadas o bloqueadas
 function dibujarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
     if (!contenedor) return;
@@ -147,7 +145,7 @@ function dibujarHorariosCliente() {
         if (bloqueadaPorBarbero || ocupadaPorCliente) {
             btn.disabled = true;
             btn.classList.add('ocupado');
-            btn.textContent = bloqueadaPorBarbero ? `${hora} (No Disp.)` : `${hora} (Tomado)`;
+            btn.textContent = `${hora} (No Disponible)`;
         } else {
             btn.disabled = false;
             btn.classList.remove('ocupado');
@@ -156,7 +154,7 @@ function dibujarHorariosCliente() {
     });
 }
 
-// Panel del barbero: estado de día completo y generación de botones
+// Vista Barbero: Alternar días u horas no disponibles
 function dibujarPanelDisponibilidad() {
     const checkDia = document.getElementById('check-bloquear-dia');
     const gridHoras = document.getElementById('grid-horas-barbero');
@@ -172,7 +170,6 @@ function dibujarPanelDisponibilidad() {
 
     checkDia.checked = Boolean(cfg.bloqueadoCompleto);
 
-    // Ajuste de opacidad sin anular el puntero del mouse
     if (cajaHoras) {
         cajaHoras.style.opacity = checkDia.checked ? '0.35' : '1';
         cajaHoras.style.pointerEvents = 'auto';
@@ -190,57 +187,35 @@ function dibujarPanelDisponibilidad() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn-hora-barbero';
-        btn.setAttribute('data-hora', hora);
 
-        const bloqueada = cfg.horasBloqueadas.includes(hora);
-        if (bloqueada) {
+        const estaBloqueada = cfg.horasBloqueadas.includes(hora);
+        if (estaBloqueada) {
             btn.classList.add('bloqueada-barbero');
-            btn.textContent = `${hora} (No Disp.)`;
+            btn.textContent = `${hora} (No Disponible)`;
         } else {
             btn.textContent = `${hora} hrs`;
         }
+
+        // Clic directo en el botón
+        btn.onclick = async (e) => {
+            e.preventDefault();
+            if (checkDia.checked) return;
+
+            if (cfg.horasBloqueadas.includes(hora)) {
+                cfg.horasBloqueadas = cfg.horasBloqueadas.filter(h => h !== hora);
+            } else {
+                cfg.horasBloqueadas.push(hora);
+            }
+
+            bloqueos[fechaHoy] = cfg;
+            actualizarPantalla();
+            await StorageManager.saveBloqueoFecha(fechaHoy, cfg);
+        };
 
         gridHoras.appendChild(btn);
     });
 }
 
-// Detección directa de clics en las horas del barbero
-function configurarClicksHorasBarbero() {
-    const gridHoras = document.getElementById('grid-horas-barbero');
-    const checkDia = document.getElementById('check-bloquear-dia');
-    if (!gridHoras) return;
-
-    gridHoras.addEventListener('click', async (e) => {
-        const btn = e.target.closest('button');
-        if (!btn || (checkDia && checkDia.checked)) return;
-
-        const hora = btn.getAttribute('data-hora') || btn.textContent.split(' ')[0].trim();
-        const fechaHoy = formatearISO(fechaSeleccionada);
-
-        if (!bloqueos[fechaHoy]) {
-            bloqueos[fechaHoy] = { bloqueadoCompleto: false, horasBloqueadas: [] };
-        }
-        const cfg = bloqueos[fechaHoy];
-        if (!Array.isArray(cfg.horasBloqueadas)) cfg.horasBloqueadas = [];
-
-        // Alternar bloqueo de hora
-        if (cfg.horasBloqueadas.includes(hora)) {
-            cfg.horasBloqueadas = cfg.horasBloqueadas.filter(h => h !== hora);
-        } else {
-            cfg.horasBloqueadas.push(hora);
-        }
-
-        bloqueos[fechaHoy] = cfg;
-        
-        // Repintado inmediato reactivo
-        actualizarPantalla();
-        
-        // Almacenamiento en background
-        await StorageManager.saveBloqueoFecha(fechaHoy, cfg);
-    });
-}
-
-// Formularios de reserva, reseñas y login
 function configurarFormularios() {
     const fReserva = document.getElementById('form-datos-finales');
     if (fReserva) {
