@@ -126,7 +126,7 @@ function dibujarMes(gridId, titleId, labelId, inputId) {
     }
 }
 
-// 1. VISTA CLIENTE: Si está bloqueada o tomada, muestra SOLO "(No Disponible)" sin hora
+// 1. VISTA CLIENTE: Si la hora no está disponible muestra "(Dia Tomado)"
 function dibujarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
     if (!contenedor) return;
@@ -143,7 +143,7 @@ function dibujarHorariosCliente() {
         if (bloqueadaPorBarbero || ocupadaPorCliente) {
             btn.disabled = true;
             btn.classList.add('ocupado');
-            btn.textContent = '(No Disponible)';
+            btn.textContent = '(Dia Tomado)';
         } else {
             btn.disabled = false;
             btn.classList.remove('ocupado');
@@ -152,7 +152,7 @@ function dibujarHorariosCliente() {
     });
 }
 
-// 2. VISTA BARBERO: Al marcar una hora, muestra SOLO "(Dia Tomado)" sin el número
+// VISTA BARBERO: Bloqueo de jornada y horarios
 function dibujarPanelDisponibilidad() {
     const checkDia = document.getElementById('check-bloquear-dia');
     const gridHoras = document.getElementById('grid-horas-barbero');
@@ -213,7 +213,41 @@ function dibujarPanelDisponibilidad() {
     });
 }
 
-// 3. VISTA RESEÑAS BARBERO: Con botón 🗑️ para borrarlas
+// VISTA RESEÑAS CLIENTE: Con botón 🗑️ para borrar y título "Respuesta de yunghtbl:"
+function dibujarResenasCliente() {
+    const cont = document.getElementById('lista-resenas');
+    if (!cont) return;
+
+    if (resenas.length === 0) {
+        cont.innerHTML = '<p style="color: #9ca3af; font-size: 0.85rem;">Aún no hay opiniones publicadas.</p>';
+        return;
+    }
+
+    const esBarbero = localStorage.getItem('barber_auth') === 'true';
+
+    cont.innerHTML = resenas.map(r => `
+        <div class="card-resena" style="margin-bottom: 12px; position: relative;">
+            <div class="resena-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>${escapar(r.nombre)}</strong>
+                    <span class="estrellas-render">${'★'.repeat(r.estrellas) + '☆'.repeat(5 - r.estrellas)}</span>
+                </div>
+                ${esBarbero ? `
+                    <button type="button" class="btn-eliminar" onclick="window.borrarResena('${r.id}')" title="Eliminar reseña" style="background: transparent; border: none; font-size: 1rem; cursor: pointer;">🗑️</button>
+                ` : ''}
+            </div>
+            <p style="margin-top: 6px; font-size: 0.9rem;">${escapar(r.comentario)}</p>
+            ${r.respuestaBarbero ? `
+                <div class="respuesta-barbero-box" style="margin-top: 8px; padding-left: 8px; border-left: 3px solid #fbbf24;">
+                    <strong style="color: #fbbf24; font-size: 0.8rem;">Respuesta de yunghtbl:</strong>
+                    <p style="font-size: 0.85rem; margin-top: 2px;">${escapar(r.respuestaBarbero)}</p>
+                </div>
+            ` : ''}
+        </div>
+    `).join('');
+}
+
+// VISTA RESEÑAS PANEL BARBERO
 function dibujarResenasBarbero() {
     const cont = document.getElementById('contenedor-gestion-resenas');
     if (!cont) return;
@@ -377,6 +411,7 @@ function configurarFormularios() {
                 localStorage.setItem('barber_auth', 'true');
                 localStorage.setItem('barber_user', email);
                 comprobarAccesoBarbero();
+                actualizarPantalla();
                 btn.disabled = false;
                 btn.textContent = 'Ingresar al Panel 🚀';
             }, 300);
@@ -389,6 +424,7 @@ function configurarFormularios() {
             localStorage.removeItem('barber_auth');
             localStorage.removeItem('barber_user');
             comprobarAccesoBarbero();
+            actualizarPantalla();
         };
     }
 }
@@ -460,32 +496,6 @@ function configurarEstrellas() {
             });
         };
     });
-}
-
-function dibujarResenasCliente() {
-    const cont = document.getElementById('lista-resenas');
-    if (!cont) return;
-
-    if (resenas.length === 0) {
-        cont.innerHTML = '<p style="color: #9ca3af; font-size: 0.85rem;">Aún no hay opiniones publicadas.</p>';
-        return;
-    }
-
-    cont.innerHTML = resenas.map(r => `
-        <div class="card-resena">
-            <div class="resena-header">
-                <strong>${escapar(r.nombre)}</strong>
-                <span class="estrellas-render">${'★'.repeat(r.estrellas) + '☆'.repeat(5 - r.estrellas)}</span>
-            </div>
-            <p style="margin-top: 6px; font-size: 0.9rem;">${escapar(r.comentario)}</p>
-            ${r.respuestaBarbero ? `
-                <div class="respuesta-barbero-box">
-                    <strong style="color: #fbbf24; font-size: 0.8rem;">Respuesta del Barbero:</strong>
-                    <p style="font-size: 0.85rem; margin-top: 2px;">${escapar(r.respuestaBarbero)}</p>
-                </div>
-            ` : ''}
-        </div>
-    `).join('');
 }
 
 function formatearISO(d) {
