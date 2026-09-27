@@ -17,7 +17,6 @@
     </header>
 
     <main class="contenedor-principal">
-        <!-- Paso 1: Selección de Fecha, Horario y Servicio -->
         <section class="card-box">
             <form id="form-agenda" novalidate onsubmit="return false;">
                 <div class="campo">
@@ -146,53 +145,7 @@
         </div>
     </div>
 
-    <!-- Script de eventos para inputs y modal del cliente -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const btnsHora = document.querySelectorAll('.btn-hora');
-            const inputHora = document.getElementById('hora');
-            const errHora = document.getElementById('err-hora');
-            const btnAbrir = document.getElementById('btn-abrir-modal');
-            const modal = document.getElementById('modal-datos-cliente');
-            const btnCerrar = document.getElementById('btn-cerrar-modal');
-            const txtResumen = document.getElementById('resumen-reserva-txt');
-            const txtTel = document.getElementById('cliente-telefono');
-
-            btnsHora.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    if (btn.disabled) return;
-                    btnsHora.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    if (inputHora) inputHora.value = btn.dataset.hora;
-                    if (errHora) errHora.textContent = '';
-                });
-            });
-
-            if (btnAbrir) {
-                btnAbrir.addEventListener('click', () => {
-                    if (!inputHora || !inputHora.value) {
-                        if (errHora) errHora.textContent = 'Selecciona un horario disponible antes de continuar.';
-                        return;
-                    }
-                    const fecha = document.getElementById('fecha')?.value || '';
-                    const servicio = document.getElementById('servicio')?.value || '';
-                    if (txtResumen) txtResumen.textContent = `📅 ${fecha} | ⏰ ${inputHora.value} hrs | ✂️ ${servicio}`;
-                    if (modal) modal.style.display = 'flex';
-                });
-            }
-
-            if (btnCerrar && modal) {
-                btnCerrar.addEventListener('click', () => modal.style.display = 'none');
-            }
-
-            if (txtTel) {
-                txtTel.addEventListener('input', (e) => {
-                    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
-                });
-            }
-        });
-    </script>
-
-    <script type="module" src="assets/js/app.js"></script>
+    <!-- Script con cache-buster -->
+    <script type="module" src="assets/js/app.js?v=3"></script>
 </body>
 </html>

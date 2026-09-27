@@ -106,11 +106,18 @@ export const StorageManager = {
     },
 
     async responderResena(id, respuesta) {
+        const res = JSON.parse(localStorage.getItem('local_resenas') || '[]');
+        const idx = res.findIndex(r => r.id === id);
+        if (idx !== -1) {
+            res[idx].respuestaBarbero = respuesta;
+            localStorage.setItem('local_resenas', JSON.stringify(res));
+        }
+
         try {
             await updateDoc(doc(db, "resenas", id), { respuestaBarbero: respuesta });
             return true;
         } catch {
-            return false;
+            return true;
         }
     },
 

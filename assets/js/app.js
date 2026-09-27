@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarFormularios();
     configurarEstrellas();
     comprobarAccesoBarbero();
+    configurarSeleccionHorariosCliente();
 
     StorageManager.suscribirCitas((data) => {
         citas = data;
@@ -126,7 +127,7 @@ function dibujarMes(gridId, titleId, labelId, inputId) {
     }
 }
 
-// 1. VISTA CLIENTE: Si la hora no está disponible muestra "(Dia Tomado)"
+// Vista Cliente: Si la hora está bloqueada muestra (Dia Tomado)
 function dibujarHorariosCliente() {
     const contenedor = document.getElementById('selector-horarios');
     if (!contenedor) return;
@@ -134,6 +135,7 @@ function dibujarHorariosCliente() {
     const fechaHoy = formatearISO(fechaSeleccionada);
     const cfg = bloqueos[fechaHoy] || { bloqueadoCompleto: false, horasBloqueadas: [] };
     const citasOcupadas = citas.filter(c => c.fecha === fechaHoy).map(c => c.hora);
+    const inputHora = document.getElementById('hora');
 
     contenedor.querySelectorAll('.btn-hora').forEach(btn => {
         const hora = btn.dataset.hora;
@@ -143,7 +145,11 @@ function dibujarHorariosCliente() {
         if (bloqueadaPorBarbero || ocupadaPorCliente) {
             btn.disabled = true;
             btn.classList.add('ocupado');
+            btn.classList.remove('active');
             btn.textContent = '(Dia Tomado)';
+            if (inputHora && inputHora.value === hora) {
+                inputHora.value = '';
+            }
         } else {
             btn.disabled = false;
             btn.classList.remove('ocupado');
@@ -152,7 +158,24 @@ function dibujarHorariosCliente() {
     });
 }
 
-// VISTA BARBERO: Bloqueo de jornada y horarios
+function configurarSeleccionHorariosCliente() {
+    const contenedor = document.getElementById('selector-horarios');
+    const inputHora = document.getElementById('hora');
+    const errHora = document.getElementById('err-hora');
+    if (!contenedor) return;
+
+    contenedor.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-hora');
+        if (!btn || btn.disabled) return;
+
+        contenedor.querySelectorAll('.btn-hora').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (inputHora) inputHora.value = btn.dataset.hora;
+        if (errHora) errHora.textContent = '';
+    });
+}
+
+// 1. VISTA BARBERO: Estado bloqueado muestra exactamente "(Dia Tomado)"
 function dibujarPanelDisponibilidad() {
     const checkDia = document.getElementById('check-bloquear-dia');
     const gridHoras = document.getElementById('grid-horas-barbero');
@@ -169,8 +192,7 @@ function dibujarPanelDisponibilidad() {
     checkDia.checked = Boolean(cfg.bloqueadoCompleto);
 
     if (cajaHoras) {
-        cajaHoras.style.opacity = checkDia.checked ? '0.35' : '1';
-        cajaHoras.style.pointerEvents = 'auto';
+        cajaHoras.style.opacity = checkDia.checked ? '0.5' : '1';
     }
 
     checkDia.onchange = async () => {
@@ -186,7 +208,7 @@ function dibujarPanelDisponibilidad() {
         btn.type = 'button';
         btn.className = 'btn-hora-barbero';
 
-        const estaBloqueada = cfg.horasBloqueadas.includes(hora);
+        const estaBloqueada = cfg.bloqueadoCompleto || cfg.horasBloqueadas.includes(hora);
         if (estaBloqueada) {
             btn.classList.add('bloqueada-barbero');
             btn.textContent = '(Dia Tomado)';
@@ -213,7 +235,54 @@ function dibujarPanelDisponibilidad() {
     });
 }
 
-// VISTA RESEÑAS CLIENTE: Con botón 🗑️ para borrar y título "Respuesta de yunghtbl:"
+// 2 Y 3. VISTA RESEÑAS PANEL BARBERO: Eliminar reseñas y responder como "yunghtbl"
+function dibujarResenasBarbero() {
+    const cont = document.getElementById('contenedor-gestion-resenas');
+    if (!cont) return;
+
+    if (resenas.length === 0) {
+        cont.innerHTML = '<p style="color: #9ca3af; font-size: 0.9rem;">No hay opiniones registradas.</p>';
+        return;
+    }
+
+    cont.innerHTML = resenas.map(r => `
+        <div class="card-resena" style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                <div>
+                    <strong>${escapar(r.nombre)} (${r.estrellas} ★)</strong>
+                    <p style="font-size: 0.9rem; margin: 4px 0;">"${escapar(r.comentario)}"</p>
+                </div>
+                <button type="button" class="btn-eliminar" onclick="window.borrarResena('${r.id}')" title="Eliminar reseña">🗑️ Borrar</button>
+            </div>
+            ${r.respuestaBarbero ? `
+                <div class="respuesta-barbero-box">
+                    <strong style="color: #fbbf24; font-size: 0.85rem;">Respuesta de (yunghtbl):</strong>
+                    <p style="color: #ffffff; font-size: 0.9rem; margin-top: 4px;">${escapar(r.respuestaBarbero)}</p>
+                </div>
+            ` : `
+                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                    <input type="text" id="resp-${r.id}" placeholder="Responder como yunghtbl..." style="padding: 8px; font-size: 0.85rem;">
+                    <button type="button" class="btn-publicar" style="width: auto; padding: 8px 14px; white-space: nowrap;" onclick="window.enviarRespuesta('${r.id}')">Responder</button>
+                </div>
+            `}
+        </div>
+    `).join('');
+}
+
+window.borrarResena = async (id) => {
+    if (confirm('¿Confirmas que deseas eliminar esta reseña permanentemente?')) {
+        await StorageManager.deleteResena(id);
+    }
+};
+
+window.enviarRespuesta = async (id) => {
+    const input = document.getElementById(`resp-${id}`);
+    const txt = input?.value.trim();
+    if (!txt) return;
+    await StorageManager.responderResena(id, txt);
+};
+
+// VISTA RESEÑAS CLIENTE
 function dibujarResenasCliente() {
     const cont = document.getElementById('lista-resenas');
     if (!cont) return;
@@ -223,74 +292,56 @@ function dibujarResenasCliente() {
         return;
     }
 
-    const esBarbero = localStorage.getItem('barber_auth') === 'true';
-
     cont.innerHTML = resenas.map(r => `
-        <div class="card-resena" style="margin-bottom: 12px; position: relative;">
-            <div class="resena-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <strong>${escapar(r.nombre)}</strong>
-                    <span class="estrellas-render">${'★'.repeat(r.estrellas) + '☆'.repeat(5 - r.estrellas)}</span>
-                </div>
-                ${esBarbero ? `
-                    <button type="button" class="btn-eliminar" onclick="window.borrarResena('${r.id}')" title="Eliminar reseña" style="background: transparent; border: none; font-size: 1rem; cursor: pointer;">🗑️</button>
-                ` : ''}
+        <div class="card-resena">
+            <div class="resena-header">
+                <strong>${escapar(r.nombre)}</strong>
+                <span class="estrellas-render">${'★'.repeat(r.estrellas) + '☆'.repeat(5 - r.estrellas)}</span>
             </div>
             <p style="margin-top: 6px; font-size: 0.9rem;">${escapar(r.comentario)}</p>
             ${r.respuestaBarbero ? `
-                <div class="respuesta-barbero-box" style="margin-top: 8px; padding-left: 8px; border-left: 3px solid #fbbf24;">
-                    <strong style="color: #fbbf24; font-size: 0.8rem;">Respuesta de yunghtbl:</strong>
-                    <p style="font-size: 0.85rem; margin-top: 2px;">${escapar(r.respuestaBarbero)}</p>
+                <div class="respuesta-barbero-box">
+                    <strong style="color: #fbbf24; font-size: 0.85rem;">Respuesta de (yunghtbl):</strong>
+                    <p style="font-size: 0.85rem; margin-top: 3px;">${escapar(r.respuestaBarbero)}</p>
                 </div>
             ` : ''}
         </div>
     `).join('');
 }
 
-// VISTA RESEÑAS PANEL BARBERO
-function dibujarResenasBarbero() {
-    const cont = document.getElementById('contenedor-gestion-resenas');
-    if (!cont) return;
-
-    if (resenas.length === 0) {
-        cont.innerHTML = '<p style="color: #9ca3af;">No hay opiniones registradas.</p>';
-        return;
-    }
-
-    cont.innerHTML = resenas.map(r => `
-        <div class="card-resena" style="margin-bottom: 12px; position: relative;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <strong>${escapar(r.nombre)} (${r.estrellas} ★)</strong>
-                    <p style="font-size: 0.9rem; margin: 4px 0;">"${escapar(r.comentario)}"</p>
-                </div>
-                <button type="button" class="btn-eliminar" onclick="window.borrarResena('${r.id}')" title="Eliminar reseña" style="padding: 4px 8px; font-size: 0.85rem; cursor: pointer;">🗑️</button>
-            </div>
-            ${r.respuestaBarbero ? `
-                <p style="color: #10b981; font-size: 0.85rem; margin-top: 6px;"><strong>Tu Respuesta:</strong> ${escapar(r.respuestaBarbero)}</p>
-            ` : `
-                <div style="display: flex; gap: 8px; margin-top: 8px;">
-                    <input type="text" id="resp-${r.id}" placeholder="Escribe tu respuesta..." style="padding: 6px; font-size: 0.85rem;">
-                    <button type="button" class="btn-publicar" style="width: auto; padding: 6px 12px;" onclick="window.enviarRespuesta('${r.id}')">Responder</button>
-                </div>
-            `}
-        </div>
-    `).join('');
-}
-
-window.borrarResena = async (id) => {
-    if (confirm('¿Deseas eliminar esta reseña?')) {
-        await StorageManager.deleteResena(id);
-    }
-};
-
-window.enviarRespuesta = async (id) => {
-    const txt = document.getElementById(`resp-${id}`)?.value.trim();
-    if (!txt) return;
-    await StorageManager.responderResena(id, txt);
-};
-
 function configurarFormularios() {
+    // Formulario cliente (reserva)
+    const btnAbrir = document.getElementById('btn-abrir-modal');
+    const modal = document.getElementById('modal-datos-cliente');
+    const btnCerrar = document.getElementById('btn-cerrar-modal');
+    const txtResumen = document.getElementById('resumen-reserva-txt');
+    const txtTel = document.getElementById('cliente-telefono');
+
+    if (btnAbrir) {
+        btnAbrir.addEventListener('click', () => {
+            const inputHora = document.getElementById('hora');
+            const errHora = document.getElementById('err-hora');
+            if (!inputHora || !inputHora.value) {
+                if (errHora) errHora.textContent = 'Selecciona un horario disponible antes de continuar.';
+                return;
+            }
+            const fecha = document.getElementById('fecha')?.value || '';
+            const servicio = document.getElementById('servicio')?.value || '';
+            if (txtResumen) txtResumen.textContent = `📅 ${fecha} | ⏰ ${inputHora.value} hrs | ✂️ ${servicio}`;
+            if (modal) modal.style.display = 'flex';
+        });
+    }
+
+    if (btnCerrar && modal) {
+        btnCerrar.addEventListener('click', () => modal.style.display = 'none');
+    }
+
+    if (txtTel) {
+        txtTel.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
+        });
+    }
+
     const fReserva = document.getElementById('form-datos-finales');
     if (fReserva) {
         fReserva.onsubmit = async (e) => {
@@ -347,8 +398,9 @@ function configurarFormularios() {
             if (ok) {
                 alert(`¡Cita agendada para el ${fecha} a las ${hora} hrs!`);
                 fReserva.reset();
-                document.getElementById('modal-datos-cliente').style.display = 'none';
-                document.getElementById('hora').value = '';
+                if (modal) modal.style.display = 'none';
+                const inputHora = document.getElementById('hora');
+                if (inputHora) inputHora.value = '';
                 document.querySelectorAll('.btn-hora').forEach(b => b.classList.remove('active'));
             } else {
                 alert('No se pudo guardar la cita. Inténtalo de nuevo.');
@@ -356,6 +408,7 @@ function configurarFormularios() {
         };
     }
 
+    // Formulario reseñas
     const fResena = document.getElementById('form-resena');
     if (fResena) {
         fResena.onsubmit = async (e) => {
@@ -381,6 +434,7 @@ function configurarFormularios() {
         };
     }
 
+    // Login Barbero
     const fLogin = document.getElementById('form-login-barbero');
     if (fLogin) {
         fLogin.onsubmit = (e) => {
@@ -414,7 +468,7 @@ function configurarFormularios() {
                 actualizarPantalla();
                 btn.disabled = false;
                 btn.textContent = 'Ingresar al Panel 🚀';
-            }, 300);
+            }, 250);
         };
     }
 
@@ -434,7 +488,7 @@ function dibujarTablaReservas() {
     if (!contenedor) return;
 
     if (citas.length === 0) {
-        contenedor.innerHTML = '<p style="color: #9ca3af;">No hay citas agendadas por el momento.</p>';
+        contenedor.innerHTML = '<p style="color: #9ca3af; font-size: 0.9rem;">No hay citas agendadas por el momento.</p>';
         return;
     }
 
@@ -448,7 +502,7 @@ function dibujarTablaReservas() {
             <td>${c.fecha} - ${c.hora} hrs</td>
             <td>${escapar(c.servicio)}</td>
             <td>
-                <button type="button" class="btn-eliminar" onclick="window.borrarCita('${c.id}')" title="Cancelar Cita">🗑️</button>
+                <button type="button" class="btn-eliminar" onclick="window.borrarCita('${c.id}')" title="Cancelar Cita">🗑️ Cancelar</button>
             </td>
         </tr>
     `).join('');
